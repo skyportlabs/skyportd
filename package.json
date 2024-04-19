@@ -1,0 +1,25 @@
+{
+  "name": "skyportd",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@keyv/sqlite": "^3.6.7",
+    "axios": "^1.6.8",
+    "body-parser": "^1.20.2",
+    "cat-loggr": "^1.2.2",
+    "chalk": "^4.1.2",
+    "child_process": "^1.0.2",
+    "dockerode": "^4.0.2",
+    "express": "^4.19.2",
+    "express-basic-auth": "^1.2.1",
+    "keyv": "^4.5.4",
+    "path": "^0.12.7",
+    "ws": "^8.16.0"
+  }
+}
