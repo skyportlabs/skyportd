@@ -1,3 +1,16 @@
+/*
+ *           __                          __      __
+ *     _____/ /____  ______  ____  _____/ /_____/ /
+ *    / ___/ //_/ / / / __ \/ __ \/ ___/ __/ __  / 
+ *   (__  ) ,< / /_/ / /_/ / /_/ / /  / /_/ /_/ /  
+ *  /____/_/|_|\__, / .___/\____/_/   \__/\__,_/   
+ *            /____/_/                        
+ * 
+ *  Skyport Daemon (skyportd)
+ *  (c) 2024 Matt James and contributers
+ * 
+*/
+
 const express = require('express');
 const Docker = require('dockerode');
 const basicAuth = require('express-basic-auth');
