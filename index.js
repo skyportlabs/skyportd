@@ -6,7 +6,7 @@
  *  /____/_/|_|\__, / .___/\____/_/   \__/\__,_/   
  *            /____/_/                        
  * 
- *  Skyport Daemon (skyportd)
+ *  Skyport Daemon v1 (Firestorm Lake)
  *  (c) 2024 Matt James and contributers
  * 
 */
