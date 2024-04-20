@@ -24,7 +24,7 @@ router.post('/create', async (req, res) => {
 
         // Create the container with the configuration from the request
         const container = await docker.createContainer({
-            Name,
+            name: Name,
             Image,
             Cmd,
             Env,
@@ -43,6 +43,7 @@ router.post('/create', async (req, res) => {
         log.info('deployment completed! container: ' + container.id)
         res.status(201).json({ message: 'Container and volume created successfully', containerId: container.id, volumeId });
     } catch (err) {
+        log.error('deployment failed')
         res.status(500).json({ message: err.message });
     }
 });

@@ -74,7 +74,7 @@ wss.on('connection', (ws) => {
 
             const container = docker.getContainer(containerId);
 
-            container.inspect((err, data) => {
+            container.inspect(async (err, data) => {
                 if (err) {
                     ws.send('Container not found');
                     return;
