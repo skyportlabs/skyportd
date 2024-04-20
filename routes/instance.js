@@ -1,3 +1,10 @@
+/**
+ * @fileoverview Provides routes for managing Docker container instances within the Skyport Daemon.
+ * This module allows for listing all Docker containers and retrieving detailed information about
+ * a specific container. Utilizes Dockerode to interact with the Docker engine via its API, handling
+ * container queries and detailed inspections.
+ */
+
 const express = require('express');
 const router = express.Router();
 const config = require('../config.json')
@@ -5,6 +12,16 @@ const Docker = require('dockerode');
 
 const docker = new Docker({ socketPath: config.docker.socket });
 
+/**
+ * GET /
+ * Retrieves a list of all Docker containers on the host, regardless of their state (running, stopped, etc.).
+ * Uses Dockerode's `listContainers` method to fetch container data. Returns a JSON list of containers or
+ * an error message if the listing fails.
+ *
+ * @param {Object} req - The HTTP request object.
+ * @param {Object} res - The HTTP response object used to return the containers list or an error message.
+ * @returns {Response} JSON response containing an array of all containers or an error message.
+ */
 router.get('/', (req, res) => {
     docker.listContainers({ all: true }, (err, containers) => {
         if (err) {
@@ -14,6 +31,17 @@ router.get('/', (req, res) => {
     });
 });
 
+/**
+ * GET /:id
+ * Fetches detailed information about a specific Docker container identified by the ID provided in the URL parameter.
+ * This endpoint uses Dockerode to call the `inspect` method on the specified container, returning all available
+ * details about the container's configuration and state. Responds with the detailed data or an error message if
+ * the container cannot be found.
+ *
+ * @param {Object} req - The HTTP request object, containing the container ID as a URL parameter.
+ * @param {Object} res - The HTTP response object used to return detailed container data or an error message.
+ * @returns {Response} JSON response with detailed container information or an error message indicating the container was not found.
+ */
 router.get('/:id', (req, res) => {
     const container = docker.getContainer(req.params.id);
     container.inspect((err, data) => {

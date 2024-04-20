@@ -11,6 +11,16 @@
  * 
 */
 
+/**
+ * @fileoverview Main entry file for the Skyport Daemon. This module sets up an
+ * Express server integrated with Docker for container management and WebSocket for real-time communication.
+ * It includes routes for instance management, deployment, and power control, as well as WebSocket endpoints
+ * for real-time container stats and logs. Authentication is enforced using basic authentication.
+ * 
+ * The server initializes with logging and configuration, sets up middleware for body parsing and authentication,
+ * and dynamically handles WebSocket connections for various operational commands and telemetry.
+ */
+
 const express = require('express');
 const Docker = require('dockerode');
 const basicAuth = require('express-basic-auth');
@@ -27,14 +37,25 @@ const { init } = require('./handlers/init.js');
 const config = require('./config.json');
 
 const dockerSocket = config.docker.socket;
+const docker = new Docker({ socketPath: dockerSocket });
+
+/**
+ * Initializes a WebSocket server tied to the HTTP server. This WebSocket server handles real-time
+ * interactions such as authentication, container statistics reporting, logs streaming, and container
+ * control commands (start, stop, restart). The WebSocket server checks for authentication on connection
+ * and message reception, parsing messages as JSON and handling them according to their specified event type.
+ */
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
-const docker = new Docker({ socketPath: dockerSocket });
 
 const log = new CatLoggr();
 
-// Initialize skyportd
+/**
+ * Sets up Express application middleware for JSON body parsing and basic authentication using predefined
+ * user keys from the configuration. Initializes routes for managing Docker instances, deployments, and
+ * power controls. These routes are grouped under the '/instances' path.
+ */
 console.log(chalk.gray(ascii) + chalk.white(`version v${config.version}\n`));
 init();
 
@@ -44,7 +65,6 @@ app.use(basicAuth({
     challenge: true
 }));
 
-// Routes
 const instanceRouter = require('./routes/instance');
 const deploymentRouter = require('./routes/deployment');
 const powerRouter = require('./routes/power');
@@ -54,10 +74,11 @@ app.use('/instances', instanceRouter);
 app.use('/instances', deploymentRouter);
 app.use('/instances', powerRouter);
 
-wss.on('connection', (ws) => {
+wss.on('connection', (ws, req) => {
     let isAuthenticated = false;
 
     ws.on('message', async (message) => {
+        log.debug('got ' + message)
         let msg = {};
         try {
             msg = JSON.parse(message);
@@ -70,15 +91,72 @@ wss.on('connection', (ws) => {
             const password = msg.args[0];
             if (password === config.key) {
                 isAuthenticated = true;
-                ws.send('Authentication successful');
+                log.info('successful authentication on ws')
+                ws.send(`\x1b[36;1m[skyportd] \x1b[0mconsole connected!`);
+
+                const urlParts = req.url.split('/');
+                const containerId = urlParts[2];
+    
+                if (!containerId) {
+                    ws.close(1008, "Container ID not specified");
+                    return;
+                }
+    
+                const container = docker.getContainer(containerId);
+    
+                container.inspect(async (err, data) => {
+                    if (err) {
+                        ws.send('Container not found');
+                        return;
+                    }
+    
+                    if (req.url.startsWith('/stats/')) {
+                        const fetchStats = () => {
+                            container.stats({stream: false}, (err, stats) => {
+                                if (err) {
+                                    ws.send(JSON.stringify({ error: 'Failed to fetch stats' }));
+                                    return;
+                                }
+                                ws.send(JSON.stringify(stats));
+                            });
+                        };
+                        fetchStats();
+                        const statsInterval = setInterval(fetchStats, 3000);
+    
+                        ws.on('close', () => {
+                            clearInterval(statsInterval);
+                            log.info('websocket client disconnected');
+                        });
+    
+                    } else if (req.url.startsWith('/logs/')) {
+                        const logStream = await container.logs({
+                            follow: true,
+                            stdout: true,
+                            stderr: true,
+                            tail: 25
+                        });
+    
+                        logStream.on('data', chunk => {
+                            ws.send(chunk.toString());
+                        });
+    
+                        ws.on('close', () => {
+                            logStream.destroy();
+                            log.info('websocket client disconnected');
+                        });
+    
+                    } else {
+                        ws.close(1002, "URL must start with either /stats/ or /logs/");
+                    }
+                });
             } else {
                 log.warn('authentication failure on websocket!')
                 ws.send('Authentication failed');
                 ws.close(1008, "Authentication failed");
                 return;
             }
-        } else if (isAuthenticated) {
-            const urlParts = ws.upgradeReq.url.split('/');
+        } else if (isAuthenticated == true) {
+            const urlParts = req.url.split('/');
             const containerId = urlParts[2];
 
             if (!containerId) {
@@ -88,51 +166,61 @@ wss.on('connection', (ws) => {
 
             const container = docker.getContainer(containerId);
 
-            container.inspect(async (err, data) => {
-                if (err) {
-                    ws.send('Container not found');
-                    return;
-                }
-
-                if (ws.upgradeReq.url.startsWith('/stats/')) {
-                    const fetchStats = () => {
-                        container.stats({stream: false}, (err, stats) => {
+            switch (msg.event) {
+                case 'cmd':
+                    if (msg.command) {
+                        container.exec({
+                            Cmd: [msg.command],
+                            AttachStdout: true,
+                            AttachStderr: true
+                        }, (err, exec) => {
                             if (err) {
-                                ws.send(JSON.stringify({ error: 'Failed to fetch stats' }));
+                                ws.send('Failed to execute command');
                                 return;
                             }
-                            ws.send(JSON.stringify(stats));
+                            exec.start((err, stream) => {
+                                if (err) {
+                                    ws.send('Execution error');
+                                    return;
+                                }
+                                stream.on('data', (data) => {
+                                    ws.send('> ' + data.toString());
+                                });
+                            });
                         });
-                    };
-                    fetchStats();
-                    const statsInterval = setInterval(fetchStats, 5000);
-
-                    ws.on('close', () => {
-                        clearInterval(statsInterval);
-                        log.info('websocket client disconnected');
+                    }
+                    break;
+                case 'power:start':
+                    container.start((err, data) => {
+                        if (err) {
+                            ws.send('Failed to start container! Is it already online?');
+                            return;
+                        }
+                        ws.send('[daemon] state: start');
                     });
-
-                } else if (ws.upgradeReq.url.startsWith('/logs/')) {
-                    const logStream = await container.logs({
-                        follow: true,
-                        stdout: true,
-                        stderr: true,
-                        tail: 10
+                    break;
+                case 'power:stop':
+                    container.stop((err, data) => {
+                        if (err) {
+                            ws.send('Failed to stop container');
+                            return;
+                        }
+                        ws.send('[daemon] state: stop');
                     });
-
-                    logStream.on('data', chunk => {
-                        ws.send(chunk.toString());
+                    break;
+                case 'power:restart':
+                    container.restart((err, data) => {
+                        if (err) {
+                            ws.send('Failed to restart container');
+                            return;
+                        }
+                        ws.send('[daemon] state: restart');
                     });
-
-                    ws.on('close', () => {
-                        logStream.destroy();
-                        log.info('websocket client disconnected');
-                    });
-
-                } else {
-                    ws.close(1002, "URL must start with either /stats/ or /logs/");
-                }
-            });
+                    break;
+                default:
+                    ws.send('Unsupported event');
+                    break;
+            }
         } else {
             log.warn('authenticated connection on websocket!')
             ws.send('Unauthorized access');
@@ -141,10 +229,15 @@ wss.on('connection', (ws) => {
     });
 });
 
+/**
+ * Default HTTP GET route that provides basic daemon status information including Docker connectivity
+ * and system info. It performs a health check on Docker to ensure it's running and accessible, returning
+ * the daemon's status and any pertinent Docker system information in the response.
+ */
 app.get('/', async (req, res) => {
     try {
-        const dockerInfo = await docker.info();  // Fetches information about the Docker system
-        const isDockerRunning = await docker.ping();  // Checks if Docker daemon is running and accessible
+        const dockerInfo = await docker.info();  // Fetches information about the docker
+        const isDockerRunning = await docker.ping();  // Checks if the docker is up (which it probably is or this will err)
 
         // Prepare the response object with Docker status
         const response = {
@@ -158,7 +251,7 @@ app.get('/', async (req, res) => {
             }
         };
 
-        res.json(response);  // Send the JSON response
+        res.json(response);
     } catch (error) {
         console.error('Error fetching Docker status:', error);
         res.status(500).json({ error: 'Docker is not running - skyportd will not function properly.' });
@@ -170,6 +263,11 @@ app.use((err, req, res, next) => {
     res.status(500).send('Something has... gone wrong!');
 });
 
+/**
+ * Starts the HTTP server with WebSocket support after a short delay, listening on the configured port.
+ * Logs a startup message indicating successful listening. This delayed start allows for any necessary
+ * initializations to complete before accepting incoming connections.
+ */
 const port = config.port;
 setTimeout(function (){
   server.listen(port, () => {
