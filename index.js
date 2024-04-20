@@ -72,6 +72,7 @@ wss.on('connection', (ws) => {
                 isAuthenticated = true;
                 ws.send('Authentication successful');
             } else {
+                log.warn('authentication failure on websocket!')
                 ws.send('Authentication failed');
                 ws.close(1008, "Authentication failed");
                 return;
@@ -108,7 +109,7 @@ wss.on('connection', (ws) => {
 
                     ws.on('close', () => {
                         clearInterval(statsInterval);
-                        console.log('Client disconnected');
+                        log.info('websocket client disconnected');
                     });
 
                 } else if (ws.upgradeReq.url.startsWith('/logs/')) {
@@ -125,7 +126,7 @@ wss.on('connection', (ws) => {
 
                     ws.on('close', () => {
                         logStream.destroy();
-                        console.log('Client disconnected');
+                        log.info('websocket client disconnected');
                     });
 
                 } else {
@@ -133,6 +134,7 @@ wss.on('connection', (ws) => {
                 }
             });
         } else {
+            log.warn('authenticated connection on websocket!')
             ws.send('Unauthorized access');
             ws.close(1008, "Unauthorized access");
         }
