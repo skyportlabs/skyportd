@@ -41,64 +41,88 @@ app.use('/instances', instanceRouter);
 app.use('/instances', deploymentRouter);
 app.use('/instances', powerRouter);
 
-wss.on('connection', (ws, req) => {
-    const urlParts = req.url.split('/');
-    const containerId = urlParts[2];
+wss.on('connection', (ws) => {
+    let isAuthenticated = false;
 
-    if (!req.url.startsWith('/logs/')) {
-        ws.close(1002, "URL must start with /logs/");
-        return;
-    }
-
-    if (!containerId) {
-        ws.close(1008, "Container ID not specified");
-        return;
-    }
-
-    const container = docker.getContainer(containerId);
-
-    // Check if the container exists and is running
-    container.inspect((err, data) => {
-        if (err) {
-            ws.send('Container not found');
+    ws.on('message', async (message) => {
+        let msg = {};
+        try {
+            msg = JSON.parse(message);
+        } catch (error) {
+            ws.send('Invalid JSON');
             return;
         }
 
-        // Set up a function to execute commands inside the container
-        const executeCommand = (command) => {
-            container.exec({
-                AttachStdin: true,
-                AttachStdout: true,
-                AttachStderr: true,
-                Cmd: ['/bin/sh', '-c', command],
-                Tty: false
-            }, (err, exec) => {
+        if (msg.event === 'auth' && msg.args) {
+            const password = msg.args[0];
+            if (password === config.key) {
+                isAuthenticated = true;
+                ws.send('Authentication successful');
+            } else {
+                ws.send('Authentication failed');
+                ws.close(1008, "Authentication failed");
+                return;
+            }
+        } else if (isAuthenticated) {
+            const urlParts = ws.upgradeReq.url.split('/');
+            const containerId = urlParts[2];
+
+            if (!containerId) {
+                ws.close(1008, "Container ID not specified");
+                return;
+            }
+
+            const container = docker.getContainer(containerId);
+
+            container.inspect((err, data) => {
                 if (err) {
-                    ws.send('Failed to execute command');
+                    ws.send('Container not found');
                     return;
                 }
 
-                exec.start({ hijack: true, stdin: true }, (err, stream) => {
-                    if (err) {
-                        ws.send('Execution error');
-                        return;
-                    }
+                if (ws.upgradeReq.url.startsWith('/stats/')) {
+                    const fetchStats = () => {
+                        container.stats({stream: false}, (err, stats) => {
+                            if (err) {
+                                ws.send(JSON.stringify({ error: 'Failed to fetch stats' }));
+                                return;
+                            }
+                            ws.send(JSON.stringify(stats));
+                        });
+                    };
+                    fetchStats();
+                    const statsInterval = setInterval(fetchStats, 5000);
 
-                    stream.on('data', (data) => {
-                        ws.send(data.toString());
+                    ws.on('close', () => {
+                        clearInterval(statsInterval);
+                        console.log('Client disconnected');
                     });
-                });
+
+                } else if (ws.upgradeReq.url.startsWith('/logs/')) {
+                    const logStream = await container.logs({
+                        follow: true,
+                        stdout: true,
+                        stderr: true,
+                        tail: 10
+                    });
+
+                    logStream.on('data', chunk => {
+                        ws.send(chunk.toString());
+                    });
+
+                    ws.on('close', () => {
+                        logStream.destroy();
+                        console.log('Client disconnected');
+                    });
+
+                } else {
+                    ws.close(1002, "URL must start with either /stats/ or /logs/");
+                }
             });
-        };
-
-        ws.on('message', message => {
-            console.log('Received command:', message);
-            executeCommand(message);
-        });
-    });
-
-    ws.on('close', () => {
-        console.log('Client disconnected');
+        } else {
+            ws.send('Unauthorized access');
+            ws.close(1008, "Unauthorized access");
+        }
     });
 });
 
