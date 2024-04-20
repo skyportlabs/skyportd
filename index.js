@@ -191,30 +191,33 @@ wss.on('connection', (ws, req) => {
                     }
                     break;
                 case 'power:start':
+                    ws.send(`\x1b[36;1m[skyportd] \x1b[32;1m[power:start] \x1b[0mdaemon is working on it...`);
                     container.start((err, data) => {
                         if (err) {
-                            ws.send('Failed to start container! Is it already online?');
+                            ws.send(`\x1b[36;1m[skyportd] \x1b[0maction failed! is the server already online?`);
                             return;
                         }
-                        ws.send('[daemon] state: start');
+                        ws.send(`\x1b[36;1m[skyportd] \x1b[32;1m[power:start] \x1b[0mdone! updated power state: start`);
                     });
                     break;
                 case 'power:stop':
+                    ws.send(`\x1b[36;1m[skyportd] \x1b[32;1m[power:stop] \x1b[0mdaemon is working on it...`);
                     container.stop((err, data) => {
                         if (err) {
-                            ws.send('Failed to stop container');
+                            ws.send(`\x1b[36;1m[skyportd] \x1b[0maction failed! is the server already offline?`);
                             return;
                         }
-                        ws.send('[daemon] state: stop');
+                        ws.send(`\x1b[36;1m[skyportd] \x1b[32;1m[power:stop] \x1b[0mdone! updated power state: stop`);
                     });
                     break;
                 case 'power:restart':
+                    ws.send(`\x1b[36;1m[skyportd] \x1b[32;1m[power:restart] \x1b[0mdaemon is working on it...`);
                     container.restart((err, data) => {
                         if (err) {
-                            ws.send('Failed to restart container');
+                            ws.send(`\x1b[36;1m[skyportd] \x1b[0maction failed!`);
                             return;
                         }
-                        ws.send('[daemon] state: restart');
+                        ws.send(`\x1b[36;1m[skyportd] \x1b[32;1m[power:restart] \x1b[0mdone! updated power state: restart`);
                     });
                     break;
                 default:
