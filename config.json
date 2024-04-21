@@ -1,10 +1,12 @@
 {
+    "_note": "The remote key is found in your Skyport panel's config.json file. The 'key' is what the Skyport panel uses to connect to this node.",
     "remote": "http://localhost:3001",
-    "remoteKey": "skyport_1",
+    "remoteKey": "skyport_default_key",
     "key": "skyportd_1",
     "port": 3000,
     "version": "1.0.0",
     "docker": {
+        "_note": "Windows: //./pipe/docker_engine - Linux/macOS: /var/run/docker.sock",
         "socket": "//./pipe/docker_engine"
     }
 }

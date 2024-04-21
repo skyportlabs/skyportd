@@ -34,6 +34,7 @@ const chalk = require('chalk')
 const ascii = fs.readFileSync('./handlers/ascii.txt', 'utf8');
 const { exec } = require('child_process');
 const { init } = require('./handlers/init.js');
+const { seed } = require('./handlers/seed.js');
 const config = require('./config.json');
 
 const dockerSocket = config.docker.socket;
@@ -58,6 +59,7 @@ const log = new CatLoggr();
  */
 console.log(chalk.gray(ascii) + chalk.white(`version v${config.version}\n`));
 init();
+seed();
 
 app.use(bodyParser.json());
 app.use(basicAuth({
