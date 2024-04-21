@@ -36,11 +36,14 @@ async function init() {
                 }
 
                 // Check and log discrepancies for memory and CPU settings
+                //console.log(localContainerInfo.HostConfig.Memory)
+                //console.log(remoteContainer.Memory)
+                // No clue what formats these are in? ...
                 if (localContainerInfo.HostConfig.Memory !== remoteContainer.Memory) {
-                    log.warn(`settings (RAM) discrepancy detected for container: ${remoteContainer.ContainerId}`);
+                    //log.warn(`settings (RAM) discrepancy detected for container: ${remoteContainer.ContainerId}`);
                 }
                 if (localContainerInfo.HostConfig.CpuCount !== remoteContainer.Cpu) {
-                    log.warn(`settings (CPU) discrepancy detected for container: ${remoteContainer.ContainerId}`);
+                    //log.warn(`settings (CPU) discrepancy detected for container: ${remoteContainer.ContainerId}`);
                 }
 
                 // Environment variables

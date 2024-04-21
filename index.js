@@ -67,12 +67,16 @@ app.use(basicAuth({
 
 const instanceRouter = require('./routes/instance');
 const deploymentRouter = require('./routes/deployment');
+const filesystemRouter = require('./routes/filesystem');
 const powerRouter = require('./routes/power');
 
 // Use routes
 app.use('/instances', instanceRouter);
 app.use('/instances', deploymentRouter);
 app.use('/instances', powerRouter);
+
+// fs
+app.use('/fs', filesystemRouter);
 
 wss.on('connection', (ws, req) => {
     let isAuthenticated = false;
@@ -191,33 +195,33 @@ wss.on('connection', (ws, req) => {
                     }
                     break;
                 case 'power:start':
-                    ws.send(`\x1b[36;1m[skyportd] \x1b[32;1m[power:start] \x1b[0mdaemon is working on it...`);
+                    ws.send(`\u001b[1m\u001b[33m[daemon] \u001b[0mworking on it...`);
                     container.start((err, data) => {
                         if (err) {
-                            ws.send(`\x1b[36;1m[skyportd] \x1b[0maction failed! is the server already online?`);
+                            ws.send(`\u001b[1m\u001b[33m[daemon] \u001b[0maction failed! is the server already online?`);
                             return;
                         }
-                        ws.send(`\x1b[36;1m[skyportd] \x1b[32;1m[power:start] \x1b[0mdone! updated power state: start`);
+                        ws.send(`\u001b[1m\u001b[33m[daemon] \u001b[0mdone! new power state: start`);
                     });
                     break;
                 case 'power:stop':
-                    ws.send(`\x1b[36;1m[skyportd] \x1b[32;1m[power:stop] \x1b[0mdaemon is working on it...`);
+                    ws.send(`\u001b[1m\u001b[33m[daemon] \u001b[0mworking on it...`);
                     container.stop((err, data) => {
                         if (err) {
-                            ws.send(`\x1b[36;1m[skyportd] \x1b[0maction failed! is the server already offline?`);
+                            ws.send(`\u001b[1m\u001b[33m[daemon] \u001b[0maction failed! is the server already offline?`);
                             return;
                         }
-                        ws.send(`\x1b[36;1m[skyportd] \x1b[32;1m[power:stop] \x1b[0mdone! updated power state: stop`);
+                        ws.send(`\u001b[1m\u001b[33m[daemon] \u001b[0mdone! new power state: stop`);
                     });
                     break;
                 case 'power:restart':
-                    ws.send(`\x1b[36;1m[skyportd] \x1b[32;1m[power:restart] \x1b[0mdaemon is working on it...`);
+                    ws.send(`\u001b[1m\u001b[33m[daemon] \u001b[0mworking on it...`);
                     container.restart((err, data) => {
                         if (err) {
-                            ws.send(`\x1b[36;1m[skyportd] \x1b[0maction failed!`);
+                            ws.send(`\u001b[1m\u001b[33m[daemon] \u001b[0maction failed!`);
                             return;
                         }
-                        ws.send(`\x1b[36;1m[skyportd] \x1b[32;1m[power:restart] \x1b[0mdone! updated power state: restart`);
+                        ws.send(`\u001b[1m\u001b[33m[daemon] \u001b[0mdone! new power state: restart`);
                     });
                     break;
                 default:
