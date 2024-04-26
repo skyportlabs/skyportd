@@ -7,14 +7,13 @@
 
 const express = require('express');
 const router = express.Router();
-const config = require('../config.json');
 const Docker = require('dockerode');
 const fs = require('node:fs');
 const path = require('path');
 const CatLoggr = require('cat-loggr');
 const log = new CatLoggr();
 
-const docker = new Docker({ socketPath: config.docker.socket });
+const docker = new Docker({ socketPath: process.env.dockerSocket });
 
 /**
  * POST /create
