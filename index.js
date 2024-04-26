@@ -37,8 +37,8 @@ const { init } = require('./handlers/init.js');
 const { seed } = require('./handlers/seed.js');
 const config = require('./config.json');
 
-const dockerSocket = process.platform === "win32" ? "//./pipe/docker_engine" : "/var/run/docker.sock";
-const docker = new Docker({ socketPath: dockerSocket });
+process.env.dockerSocket = process.platform === "win32" ? "//./pipe/docker_engine" : "/var/run/docker.sock";
+const docker = new Docker({ socketPath: process.env.dockerSocket });
 
 /**
  * Initializes a WebSocket server tied to the HTTP server. This WebSocket server handles real-time
