@@ -5,7 +5,7 @@ const CatLoggr = require('cat-loggr');
 const log = new CatLoggr();
 
 // Initialize Docker connection
-const docker = new Docker({ socketPath: config.docker.socket });
+const docker = new Docker({ socketPath: process.env.dockerSocket });
 
 async function init() {
     try {
