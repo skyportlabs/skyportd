@@ -7,10 +7,9 @@
 
 const express = require('express');
 const router = express.Router();
-const config = require('../config.json')
 const Docker = require('dockerode');
 
-const docker = new Docker({ socketPath: config.docker.socket });
+const docker = new Docker({ socketPath: process.env.dockerSocket });
 
 /**
  * POST /:id/:power
