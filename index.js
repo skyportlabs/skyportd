@@ -20,7 +20,7 @@
  * The server initializes with logging and configuration, sets up middleware for body parsing and authentication,
  * and dynamically handles WebSocket connections for various operational commands and telemetry.
  */
-
+process.env.dockerSocket = process.platform === "win32" ? "//./pipe/docker_engine" : "/var/run/docker.sock";
 const express = require('express');
 const Docker = require('dockerode');
 const basicAuth = require('express-basic-auth');
@@ -37,7 +37,6 @@ const { init } = require('./handlers/init.js');
 const { seed } = require('./handlers/seed.js');
 const config = require('./config.json');
 
-process.env.dockerSocket = process.platform === "win32" ? "//./pipe/docker_engine" : "/var/run/docker.sock";
 const docker = new Docker({ socketPath: process.env.dockerSocket });
 
 /**
