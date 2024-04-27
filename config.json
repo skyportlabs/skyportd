@@ -4,9 +4,5 @@
     "remoteKey": "skyport_default_key",
     "key": "skyportd_1",
     "port": 3000,
-    "version": "1.0.0",
-    "docker": {
-        "_note": "Windows: //./pipe/docker_engine - Linux/macOS: /var/run/docker.sock",
-        "socket": "//./pipe/docker_engine"
-    }
+    "version": "1.0.0"
 }
