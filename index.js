@@ -176,7 +176,7 @@ wss.on('connection', (ws, req) => {
                 case 'cmd':
                     if (msg.command) {
                         container.exec({
-                            Cmd: [msg.command],
+                            Cmd: parseCommand(msg.command),
                             AttachStdout: true,
                             AttachStderr: true
                         }, (err, exec) => {
@@ -208,7 +208,7 @@ wss.on('connection', (ws, req) => {
                     break;
                 case 'power:stop':
                     ws.send(`\u001b[1m\u001b[33m[daemon] \u001b[0mworking on it...`);
-                    container.stop((err, data) => {
+                    container.kill((err, data) => {
                         if (err) {
                             ws.send(`\u001b[1m\u001b[33m[daemon] \u001b[0maction failed! is the server already offline?`);
                             return;
@@ -237,6 +237,10 @@ wss.on('connection', (ws, req) => {
         }
     });
 });
+
+function parseCommand(cmdString) {
+    return cmdString.match(/(?:[^\s"]+|"[^"]*")+/g);
+}
 
 /**
  * Default HTTP GET route that provides basic daemon status information including Docker connectivity

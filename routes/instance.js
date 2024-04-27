@@ -43,6 +43,7 @@ router.get('/', (req, res) => {
  * @returns {Response} JSON response with detailed container information or an error message indicating the container was not found.
  */
 router.get('/:id', (req, res) => {
+    if (req.params.id) return res.send('no id')
     const container = docker.getContainer(req.params.id);
     container.inspect((err, data) => {
         if (err) {
