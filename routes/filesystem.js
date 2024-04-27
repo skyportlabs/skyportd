@@ -42,6 +42,8 @@ router.get('/:id/files', async (req, res) => {
     const subPath = req.query.path || ''; // Use query parameter to get the subpath
     const volumePath = path.join(__dirname, '../volumes', volumeId);
 
+    if (!volumeId) return res.status(400).json({ message: 'No volume ID' });
+
     try {
         // Ensure the path is safe and resolve it to an absolute path
         const fullPath = safePath(volumePath, subPath);
@@ -73,12 +75,23 @@ router.get('/:id/files', async (req, res) => {
  * @param {string} filename - The name of the file to view.
  * @returns {Response} JSON response containing the content of the file if viewable, or an error message.
  */
-router.get('/:id/files/view', async (req, res) => {
+router.get('/:id/files/view/:filename', async (req, res) => {
     const { id, filename } = req.params;
     const volumePath = path.join(__dirname, '../volumes', id);
+
+    if (!id || !filename) return res.status(400).json({ message: 'No volume ID' });
     
+    const dirPath = req.query.path;
+    
+    let formattedPath;
+    if (dirPath) {
+        formattedPath = dirPath + '/' + filename
+    } else {
+        formattedPath = filename
+    }
+
     try {
-        const filePath = safePath(volumePath, filename);
+        const filePath = safePath(volumePath, formattedPath);
         if (!isEditable(filePath)) {
             return res.status(400).json({ message: 'File type not supported for viewing' });
         }
