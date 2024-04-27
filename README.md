@@ -1,13 +1,7 @@
 # Skyport Daemon (skyportd)
 
 ## Overview
-Skyport Daemon is a backend service that interfaces with Docker to manage and monitor containerized instances. It provides a robust API for real-time container management and data retrieval.
-
-## Features
-- Full Docker integration for container management.
-- WebSocket endpoints for real-time monitoring and control.
-- Authentication for secure access to management functions.
-- Automated actions including container deployment, status checks, and power management.
+Skyport Daemon is the daemon for the Skyport Panel.
 
 ## Installation
 1. Clone the repository:
@@ -16,11 +10,14 @@ Skyport Daemon is a backend service that interfaces with Docker to manage and mo
 2. Install dependencies:
 `npm install`
 
-3. Start the Daemon:
+3. Configure Skyportd:
+- Get your Panel's access key from the Skyport panel's config.json file and set it as 'remoteKey'. Do the same for the other way, set your skyportd access key and configure it on the Panel.
+
+4. Start the Daemon:
 `node . # or use pm2 to keep it online`
 
 ## Configuration
-Configuration settings can be adjusted in the `config.json` file. This includes Docker socket configurations and the authentication key for API access.
+Configuration settings can be adjusted in the `config.json` file. This includes the authentication key for API access.
 
 ## Usage
 The daemon runs as a background service, interfacing with the Skyport Panel for operational commands and status updates. It is not typically interacted with directly by end-users.
