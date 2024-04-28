@@ -52,4 +52,18 @@ router.get('/:id', (req, res) => {
     });
 });
 
+// List all ports for a specific Docker container
+router.get('/:id/ports', (req, res) => {
+    if (!req.params.id) return res.status(400).json({ message: 'Container ID is required' });
+    const container = docker.getContainer(req.params.id);
+    container.inspect((err, data) => {
+        if (err) {
+            return res.status(404).json({ message: "Container not found" });
+        }
+        const ports = data.NetworkSettings.Ports || {};
+        const portList = Object.keys(ports).map(key => ({ port: key }));
+        res.json(portList);
+    });
+});
+
 module.exports = router;
