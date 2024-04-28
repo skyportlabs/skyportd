@@ -116,9 +116,18 @@ router.post('/:id/files/edit', async (req, res) => {
     const { id, filename } = req.params;
     const { content } = req.body;
     const volumePath = path.join(__dirname, '../volumes', id);
+
+    const dirPath = req.query.path;
+    
+    let formattedPath;
+    if (dirPath) {
+        formattedPath = dirPath + '/' + filename
+    } else {
+        formattedPath = filename
+    }
     
     try {
-        const filePath = safePath(volumePath, filename);
+        const filePath = safePath(volumePath, formattedPath);
         if (!isEditable(filePath)) {
             return res.status(400).json({ message: 'File type not supported for editing' });
         }
