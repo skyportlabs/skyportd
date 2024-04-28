@@ -112,7 +112,7 @@ router.get('/:id/files/view/:filename', async (req, res) => {
  * @param {string} content - The new content to write to the file.
  * @returns {Response} JSON response indicating the result of the file update operation.
  */
-router.post('/:id/files/edit', async (req, res) => {
+router.post('/:id/files/edit/:filename', async (req, res) => {
     const { id, filename } = req.params;
     const { content } = req.body;
     const volumePath = path.join(__dirname, '../volumes', id);
