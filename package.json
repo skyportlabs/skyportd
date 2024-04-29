@@ -20,6 +20,7 @@
     "express": "^4.19.2",
     "express-basic-auth": "^1.2.1",
     "keyv": "^4.5.4",
+    "multer": "^1.4.5-lts.1",
     "path": "^0.12.7",
     "ws": "^8.16.0"
   }
