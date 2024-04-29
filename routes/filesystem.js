@@ -139,6 +139,69 @@ router.post('/:id/files/edit/:filename', async (req, res) => {
 });
 
 /**
+ * POST /:id/files/create
+ * Creates a file with the specified filename and content within a volume, optionally within a subdirectory.
+ * The path to the subdirectory can be provided via a query parameter.
+ * 
+ * @param {string} id - The volume identifier.
+ * @param {string} filename - The name of the file to create.
+ * @param {string} content - The content to write to the file.
+ * @returns {Response} JSON response indicating the result of the file creation operation.
+ */
+router.post('/:id/files/create/:filename', async (req, res) => {
+    const { id, filename } = req.params;
+    const { content } = req.body;
+    const volumePath = path.join(__dirname, '../volumes', id);
+    const subPath = req.query.path || ''; // Use query parameter to get the subpath
+
+    try {
+        // Ensure the path is safe and resolve it to an absolute path
+        const fullPath = safePath(path.join(volumePath, subPath), filename);
+
+        // Write the content to the new file
+        await fs.writeFile(fullPath, content);
+        res.json({ message: 'File created successfully' });
+    } catch (err) {
+        if (err.code === 'ENOENT') {
+            res.status(404).json({ message: 'Specified path not found' });
+        } else {
+            res.status(500).json({ message: err.message });
+        }
+    }
+});
+
+/**
+ * POST /:id/folders/create
+ * Creates a folder within a specified volume, optionally within a subdirectory.
+ * The path to the subdirectory can be provided via a query parameter.
+ * 
+ * @param {string} id - The volume identifier.
+ * @param {string} foldername - The name of the folder to create.
+ * @returns {Response} JSON response indicating the result of the folder creation operation.
+ */
+router.post('/:id/folders/create/:foldername', async (req, res) => {
+    const { id, foldername } = req.params;
+    const volumePath = path.join(__dirname, '../volumes', id);
+    const subPath = req.query.path || '';
+
+    try {
+        // Ensure the path is safe and resolve it to an absolute path
+        const fullPath = safePath(volumePath, subPath);
+        const targetFolderPath = path.join(fullPath, foldername);
+
+        // Create the folder
+        await fs.mkdir(targetFolderPath, { recursive: true });
+        res.json({ message: 'Folder created successfully' });
+    } catch (err) {
+        if (err.code === 'EEXIST') {
+            res.status(400).json({ message: 'Folder already exists' });
+        } else {
+            res.status(500).json({ message: err.message });
+        }
+    }
+});
+
+/**
  * DELETE /:id/files/delete
  * Deletes a specific file within a volume. Validates the file path to ensure it is within the designated volume directory.
  *
