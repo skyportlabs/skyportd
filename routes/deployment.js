@@ -28,7 +28,7 @@ const docker = new Docker({ socketPath: process.env.dockerSocket });
  */
 router.post('/create', async (req, res) => {
     log.info('deployment in progress...')
-    const { Image, Cmd, Env, Ports, Memory, Cpu, Name, PortBindings } = req.body;
+    const { Image, Cmd, Env, Ports, Memory, Cpu, PortBindings, ConfigFilePath, ConfigFileContent } = req.body;
 
     try {
         // Pull the Docker image if not already available
@@ -39,9 +39,14 @@ router.post('/create', async (req, res) => {
         const volumePath = path.join(__dirname, '../volumes', volumeId); // Using timestamp for unique dir
         fs.mkdirSync(volumePath, { recursive: true });
 
+        // If ConfigFilePath and ConfigFileContent are provided, create config file inside volume
+        if (ConfigFilePath && ConfigFileContent) {
+            const fullConfigPath = path.join(volumePath, ConfigFilePath);
+            fs.writeFileSync(fullConfigPath, ConfigFileContent);
+        }
+
         // Create the container with the configuration from the request
         const containerOptions = {
-            name: Name,
             Image,
             ExposedPorts: Ports,
             AttachStdout: true,
