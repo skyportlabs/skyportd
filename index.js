@@ -126,7 +126,7 @@ wss.on('connection', (ws, req) => {
                             });
                         };
                         fetchStats();
-                        const statsInterval = setInterval(fetchStats, 3000);
+                        const statsInterval = setInterval(fetchStats, 3000);   
     
                         ws.on('close', () => {
                             clearInterval(statsInterval);
@@ -183,14 +183,14 @@ wss.on('connection', (ws, req) => {
                                 ws.send('Failed to execute command');
                                 return;
                             }
-                            exec.start((err, stream) => {
+                            
+                            exec.start({ hijack: true, stdin: true }, (err, stream) => {
                                 if (err) {
                                     ws.send('Execution error');
                                     return;
                                 }
-                                stream.on('data', (data) => {
-                                    ws.send('> ' + data.toString());
-                                });
+                                
+                                stream.pipe(ws);
                             });
                         });
                     }
