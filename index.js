@@ -47,7 +47,6 @@ const docker = new Docker({ socketPath: process.env.dockerSocket });
  */
 const app = express();
 const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
 
 const log = new CatLoggr();
 
@@ -79,167 +78,212 @@ app.use('/instances', powerRouter);
 // fs
 app.use('/fs', filesystemRouter);
 
-wss.on('connection', (ws, req) => {
-    let isAuthenticated = false;
+/**
+ * Initializes a WebSocket server tied to the HTTP server. This WebSocket server handles real-time
+ * interactions such as authentication, container statistics reporting, logs streaming, and container
+ * control commands (start, stop, restart). The WebSocket server checks for authentication on connection
+ * and message reception, parsing messages as JSON and handling them according to their specified event type.
+ * 
+ * @param {http.Server} server - The HTTP server to bind the WebSocket server to.
+ */
+function initializeWebSocketServer(server) {
+    const wss = new WebSocket.Server({ server });
 
-    ws.on('message', async (message) => {
-        log.debug('got ' + message)
-        let msg = {};
-        try {
-            msg = JSON.parse(message);
-        } catch (error) {
-            ws.send('Invalid JSON');
-            return;
-        }
+    wss.on('connection', (ws, req) => {
+        let isAuthenticated = false;
 
-        if (msg.event === 'auth' && msg.args) {
-            const password = msg.args[0];
-            if (password === config.key) {
-                isAuthenticated = true;
-                log.info('successful authentication on ws')
-                ws.send(`\x1b[36;1m[skyportd] \x1b[0mconsole connected!`);
+        ws.on('message', async (message) => {
+            log.debug('got ' + message);
+            let msg = {};
+            try {
+                msg = JSON.parse(message);
+            } catch (error) {
+                ws.send('Invalid JSON');
+                return;
+            }
 
+            if (msg.event === 'auth' && msg.args) {
+                authenticateWebSocket(ws, req, msg.args[0], (authenticated, containerId) => {
+                    if (authenticated) {
+                        isAuthenticated = true;
+                        handleWebSocketConnection(ws, req, containerId);
+                    } else {
+                        ws.send('Authentication failed');
+                        ws.close(1008, "Authentication failed");
+                    }
+                });
+            } else if (isAuthenticated) {
                 const urlParts = req.url.split('/');
                 const containerId = urlParts[2];
-    
+
                 if (!containerId) {
                     ws.close(1008, "Container ID not specified");
                     return;
                 }
-    
+
                 const container = docker.getContainer(containerId);
-    
-                container.inspect(async (err, data) => {
-                    if (err) {
-                        ws.send('Container not found');
-                        return;
-                    }
-    
-                    if (req.url.startsWith('/stats/')) {
-                        const fetchStats = () => {
-                            container.stats({stream: false}, (err, stats) => {
-                                if (err) {
-                                    ws.send(JSON.stringify({ error: 'Failed to fetch stats' }));
-                                    return;
-                                }
-                                ws.send(JSON.stringify(stats));
-                            });
-                        };
-                        fetchStats();
-                        const statsInterval = setInterval(fetchStats, 3000);   
-    
-                        ws.on('close', () => {
-                            clearInterval(statsInterval);
-                            log.info('websocket client disconnected');
-                        });
-    
-                    } else if (req.url.startsWith('/logs/')) {
-                        const logStream = await container.logs({
-                            follow: true,
-                            stdout: true,
-                            stderr: true,
-                            tail: 25
-                        });
-    
-                        logStream.on('data', chunk => {
-                            ws.send(chunk.toString());
-                        });
-    
-                        ws.on('close', () => {
-                            logStream.destroy();
-                            log.info('websocket client disconnected');
-                        });
-    
-                    } else {
-                        ws.close(1002, "URL must start with either /stats/ or /logs/");
-                    }
-                });
+
+                switch (msg.event) {
+                    case 'cmd':
+                        // Do absolutely fucking nothing. Not handling it here.
+                        break;
+                    case 'power:start':
+                        performPowerAction(ws, container, 'start');
+                        break;
+                    case 'power:stop':
+                        performPowerAction(ws, container, 'stop');
+                        break;
+                    case 'power:restart':
+                        performPowerAction(ws, container, 'restart');
+                        break;
+                    default:
+                        ws.send('Unsupported event');
+                        break;
+                }
             } else {
-                log.warn('authentication failure on websocket!')
-                ws.send('Authentication failed');
-                ws.close(1008, "Authentication failed");
-                return;
+                ws.send('Unauthorized access');
+                ws.close(1008, "Unauthorized access");
             }
-        } else if (isAuthenticated == true) {
-            const urlParts = req.url.split('/');
-            const containerId = urlParts[2];
+        });
 
-            if (!containerId) {
-                ws.close(1008, "Container ID not specified");
-                return;
+        function authenticateWebSocket(ws, req, password, callback) {
+            if (password === config.key) {
+                log.info('successful authentication on ws');
+                ws.send(`\x1b[36;1m[skyportd] \x1b[0mconsole connected!`);
+                const urlParts = req.url.split('/');
+                const containerId = urlParts[2];
+
+                if (!containerId) {
+                    ws.close(1008, "Container ID not specified");
+                    callback(false, null);
+                    return;
+                }
+                callback(true, containerId);
+            } else {
+                log.warn('authentication failure on websocket!');
+                callback(false, null);
             }
+        }
 
+        function handleWebSocketConnection(ws, req, containerId) {
             const container = docker.getContainer(containerId);
 
-            switch (msg.event) {
-                case 'cmd':
-                    if (msg.command) {
-                        container.exec({
-                            Cmd: parseCommand(msg.command),
-                            AttachStdout: true,
-                            AttachStderr: true
-                        }, (err, exec) => {
-                            if (err) {
-                                ws.send('Failed to execute command');
-                                return;
-                            }
-                            
-                            exec.start({ hijack: true, stdin: true }, (err, stream) => {
-                                if (err) {
-                                    ws.send('Execution error');
-                                    return;
-                                }
-                                
-                                stream.pipe(ws);
-                            });
-                        });
+            container.inspect(async (err, data) => {
+                if (err) {
+                    ws.send('Container not found');
+                    return;
+                }
+
+                if (req.url.startsWith('/exec/')) {
+                    setupExecSession(ws, container);
+                } else if (req.url.startsWith('/stats/')) {
+                    setupStatsStreaming(ws, container);
+                } else {
+                    ws.close(1002, "URL must start with /exec/ or /stats/");
+                }
+            });
+        }
+
+        async function setupExecSession(ws, container) {
+            const logStream = await container.logs({
+                follow: true,
+                stdout: true,
+                stderr: true,
+                tail: 25
+            });
+
+            logStream.on('data', chunk => {
+                ws.send(chunk.toString());
+            });
+
+            ws.on('message', (msg) => {
+                if (isAuthenticated) {
+                    const command = JSON.parse(msg).command;
+                    executeCommand(ws, container, command);
+                }
+            });
+
+            ws.on('close', () => {
+                logStream.destroy();
+                log.info('WebSocket client disconnected');
+            });
+        }
+
+        function setupStatsStreaming(ws, container) {
+            const fetchStats = () => {
+                container.stats({ stream: false }, (err, stats) => {
+                    if (err) {
+                        ws.send(JSON.stringify({ error: 'Failed to fetch stats' }));
+                        return;
                     }
-                    break;
-                case 'power:start':
-                    ws.send(`\u001b[1m\u001b[33m[daemon] \u001b[0mworking on it...`);
-                    container.start((err, data) => {
-                        if (err) {
-                            ws.send(`\u001b[1m\u001b[33m[daemon] \u001b[0maction failed! is the server already online?`);
-                            return;
-                        }
-                        ws.send(`\u001b[1m\u001b[33m[daemon] \u001b[0mdone! new power state: start`);
-                    });
-                    break;
-                case 'power:stop':
-                    ws.send(`\u001b[1m\u001b[33m[daemon] \u001b[0mworking on it...`);
-                    container.kill((err, data) => {
-                        if (err) {
-                            ws.send(`\u001b[1m\u001b[33m[daemon] \u001b[0maction failed! is the server already offline?`);
-                            return;
-                        }
-                        ws.send(`\u001b[1m\u001b[33m[daemon] \u001b[0mdone! new power state: stop`);
-                    });
-                    break;
-                case 'power:restart':
-                    ws.send(`\u001b[1m\u001b[33m[daemon] \u001b[0mworking on it...`);
-                    container.restart((err, data) => {
-                        if (err) {
-                            ws.send(`\u001b[1m\u001b[33m[daemon] \u001b[0maction failed!`);
-                            return;
-                        }
-                        ws.send(`\u001b[1m\u001b[33m[daemon] \u001b[0mdone! new power state: restart`);
-                    });
-                    break;
-                default:
-                    ws.send('Unsupported event');
-                    break;
+                    ws.send(JSON.stringify(stats));
+                });
+            };
+            fetchStats();
+            const statsInterval = setInterval(fetchStats, 3000);
+
+            ws.on('close', () => {
+                clearInterval(statsInterval);
+                log.info('WebSocket client disconnected');
+            });
+        }
+
+        async function executeCommand(ws, container, command) {
+            log.info('Executing command:', command);
+            try {
+                const stream = await container.attach({
+                    stream: true,
+                    stdin: true,
+                    stdout: true,
+                    stderr: true,
+                    hijack: true
+                });
+        
+                stream.on('data', (chunk) => {
+                    //ws.send(chunk.toString('utf8'));
+                });
+        
+                stream.on('end', () => {
+                    log.info('Attach stream ended');
+                    ws.send('\nCommand execution completed');
+                });
+        
+                stream.on('error', (err) => {
+                    log.error('Attach stream error:', err);
+                    ws.send(`Error in attach stream: ${err.message}`);
+                });
+        
+                // Write the command to the stream
+                stream.write(command + '\n');
+        
+            } catch (err) {
+                log.error('Failed to attach to container:', err);
+                ws.send(`Failed to attach to container: ${err.message}`);
             }
-        } else {
-            log.warn('authenticated connection on websocket!')
-            ws.send('Unauthorized access');
-            ws.close(1008, "Unauthorized access");
+        }
+
+        function performPowerAction(ws, container, action) {
+            ws.send(`\u001b[1m\u001b[33m[daemon] \u001b[0mworking on it...`);
+
+            const actionMap = {
+                'start': container.start.bind(container),
+                'stop': container.kill.bind(container),
+                'restart': container.restart.bind(container),
+            };
+
+            actionMap[action]((err, data) => {
+                if (err) {
+                    ws.send(`\u001b[1m\u001b[33m[daemon] \u001b[0maction failed!`);
+                    return;
+                }
+                ws.send(`\u001b[1m\u001b[33m[daemon] \u001b[0mdone! new power state: ${action}`);
+            });
         }
     });
-});
-
-function parseCommand(cmdString) {
-    return cmdString.match(/(?:[^\s"]+|"[^"]*")+/g);
 }
+
+// Start the websocket server
+initializeWebSocketServer(server);
 
 /**
  * Default HTTP GET route that provides basic daemon status information including Docker connectivity

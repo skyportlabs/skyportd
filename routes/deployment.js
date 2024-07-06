@@ -33,6 +33,8 @@ router.post('/create', async (req, res) => {
     try {
         // Pull the Docker image if not already available
         await docker.pull(Image);
+        console.log(ConfigFilePath)
+        console.log(ConfigFileContent)
 
         // Define the volume path
         let volumeId = new Date().getTime().toString();
