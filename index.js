@@ -78,8 +78,9 @@ app.use('/instances', powerRouter);
 // fs
 app.use('/fs', filesystemRouter);
 
+// FTP
 app.get('/ftp/info/:id', (req, res) => {
-    const filePath = './sftpdatacontainer/user-' + req.params.id + '.json';
+    const filePath = './ftp/user-' + req.params.id + '.json';
     fs.readFile(filePath, 'utf8', (err, data) => {
         if (err) {
             console.error('Error reading file:', err);
