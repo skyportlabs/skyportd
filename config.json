@@ -8,9 +8,9 @@
 
     "_note3": "Other configuration options below. Hostname must be set for FTP to return the correct info.",
     "port": 3000,
-    "version": "1.0.0",
+    "version": "0.1.0-canary",
   "ftp": {
-    "ip": "192.168.1.11",
-    "port": 21
+    "ip": "localhost",
+    "port": 3002
   }
 }
