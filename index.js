@@ -69,16 +69,26 @@ const instanceRouter = require('./routes/instance');
 const deploymentRouter = require('./routes/deployment');
 const filesystemRouter = require('./routes/filesystem');
 const powerRouter = require('./routes/power');
-const ftpRouter = require('./routes/ftp');
 
 // Use routes
 app.use('/instances', instanceRouter);
 app.use('/instances', deploymentRouter);
 app.use('/instances', powerRouter);
-app.use('/instances', ftpRouter);
 
 // fs
 app.use('/fs', filesystemRouter);
+
+app.get('/ftp/info/:id', (req, res) => {
+    const filePath = './sftpdatacontainer/user-' + req.params.id + '.json';
+    fs.readFile(filePath, 'utf8', (err, data) => {
+        if (err) {
+            console.error('Error reading file:', err);
+            res.status(500).json({ error: 'Error reading file' });
+            return;
+        }
+        res.json(JSON.parse(data));
+    });
+});
 
 /**
  * Initializes a WebSocket server tied to the HTTP server. This WebSocket server handles real-time
