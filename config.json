@@ -1,8 +1,16 @@
 {
-    "_note": "The remote key is found in your Skyport panel's config.json file. The 'key' is what the Skyport panel uses to connect to this node.",
+    "_note1": "The key below is used for Skyport Daemon to access the Panel to retrieve images and instances. You can set this key (temporarily) in your Panel's config.json file.",
     "remote": "http://localhost:3001",
     "remoteKey": "skyport_default_key",
+
+    "_note2": "This is the 2nd key, used by the Panel for accessing the Daemon (also temporarily). You should set this as the key when you create a node on your Panel.",
     "key": "skyportd_1",
+
+    "_note3": "Other configuration options below. Hostname must be set for FTP to return the correct info.",
     "port": 3000,
-    "version": "1.0.0"
+    "version": "1.0.0",
+    "ftp": {
+        "_note": "This can either be an externally accessible IP, or a hostname. An example would be 1.1.1.1 - or my.example.com.",
+        "hostname": "skyport.dev"
+    }
 }

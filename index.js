@@ -69,11 +69,13 @@ const instanceRouter = require('./routes/instance');
 const deploymentRouter = require('./routes/deployment');
 const filesystemRouter = require('./routes/filesystem');
 const powerRouter = require('./routes/power');
+const ftpRouter = require('./routes/ftp');
 
 // Use routes
 app.use('/instances', instanceRouter);
 app.use('/instances', deploymentRouter);
 app.use('/instances', powerRouter);
+app.use('/instances', ftpRouter);
 
 // fs
 app.use('/fs', filesystemRouter);
