@@ -9,8 +9,8 @@
     "_note3": "Other configuration options below. Hostname must be set for FTP to return the correct info.",
     "port": 3000,
     "version": "1.0.0",
-    "ftp": {
-        "_note": "This can either be an externally accessible IP, or a hostname. An example would be 1.1.1.1 - or my.example.com.",
-        "hostname": "skyport.dev"
-    }
+  "ftp": {
+    "ip": "192.168.1.11",
+    "port": 21
+  }
 }
