@@ -35,6 +35,7 @@ const ascii = fs.readFileSync('./handlers/ascii.txt', 'utf8');
 const { exec } = require('child_process');
 const { init } = require('./handlers/init.js');
 const { seed } = require('./handlers/seed.js');
+const { start, createNewVolume } = require('./routes/ftp.js')
 const config = require('./config.json');
 
 const docker = new Docker({ socketPath: process.env.dockerSocket });
@@ -79,6 +80,7 @@ app.use('/instances', powerRouter);
 app.use('/fs', filesystemRouter);
 
 // FTP
+start();
 app.get('/ftp/info/:id', (req, res) => {
     const filePath = './ftp/user-' + req.params.id + '.json';
     fs.readFile(filePath, 'utf8', (err, data) => {

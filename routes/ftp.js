@@ -131,4 +131,4 @@ const start = async () => {
   log.info(`ftp server started on port ${options.port}`);
 };
 
-module.exports = { start };
+module.exports = { start, createNewVolume };
