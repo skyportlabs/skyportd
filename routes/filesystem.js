@@ -26,7 +26,34 @@ function safePath(base, target) {
  * @returns {boolean} True if the file's extension is in the list of editable types, false otherwise.
  */
 function isEditable(file) {
-    const editableExtensions = ['.txt', '.json', '.js', '.html', '.css', '.md'];
+    const editableExtensions = [
+        // Text files
+        '.txt', '.md', '.rtf', '.log', '.ini', '.csv',
+        
+        // Web development
+        '.html', '.htm', '.css', '.scss', '.sass', '.less',
+        '.js', '.ts', '.jsx', '.tsx', '.json', '.xml', '.svg',
+        
+        // Programming languages
+        '.py', '.java', '.c', '.cpp', '.h', '.hpp', '.cs', '.go',
+        '.rb', '.php', '.swift', '.kt', '.rs', '.scala', '.groovy',
+        
+        // Scripting
+        '.sh', '.bash', '.ps1', '.bat', '.cmd',
+        
+        // Markup and config
+        '.yaml', '.yml', '.toml', '.ini', '.cfg', '.conf',
+        
+        // Document formats
+        '.tex', '.bib', '.markdown',
+        
+        // Database
+        '.sql',
+        
+        // Others
+        '.gitignore', '.env', '.htaccess'
+    ];
+    
     return editableExtensions.includes(path.extname(file).toLowerCase());
 }
 
