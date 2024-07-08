@@ -102,7 +102,7 @@ app.get('/ftp/info/:id', (req, res) => {
  * @param {http.Server} server - The HTTP server to bind the WebSocket server to.
  */
 function initializeWebSocketServer(server) {
-    const wss = new WebSocket.Server({ server });
+    const wss = new WebSocket.Server({ server }); // use express-ws so you can have multiple ws's, api routes & that on 1 server.
 
     wss.on('connection', (ws, req) => {
         let isAuthenticated = false;
@@ -245,7 +245,7 @@ function initializeWebSocketServer(server) {
                 });
             };
             fetchStats();
-            const statsInterval = setInterval(fetchStats, 3000);
+            const statsInterval = setInterval(fetchStats, 3000); // oh my. please just listen to the docker stream and whenever docker gives u smt then broadcast it, u will rape the nodes this way
 
             ws.on('close', () => {
                 clearInterval(statsInterval);
@@ -278,7 +278,7 @@ function initializeWebSocketServer(server) {
                 });
         
                 // Write the command to the stream
-                stream.write(command + '\n');
+                stream.write(command + '\n'); // your not disattaching.
         
             } catch (err) {
                 log.error('Failed to attach to container:', err);
@@ -300,7 +300,7 @@ function initializeWebSocketServer(server) {
                     ws.send(`\u001b[1m\u001b[33m[daemon] \u001b[0maction failed!`);
                     return;
                 }
-                ws.send(`\u001b[1m\u001b[33m[daemon] \u001b[0mdone! new power state: ${action}`);
+                ws.send(`\u001b[1m\u001b[33m[daemon] \u001b[0mdone! new power state: ${action}`); // please serialise messages to base64.
             });
         }
 
@@ -332,7 +332,7 @@ function initializeWebSocketServer(server) {
 
             return totalSize;
         }
-
+        // i can make 10000 .txt files with nothing in ur daemon will crash from oom bcz how ur looping thru stuff
         function formatBytes(bytes) {
             if (bytes === 0) return '0 Bytes';
             const k = 1024;
@@ -359,7 +359,7 @@ app.get('/', async (req, res) => {
         // Prepare the response object with Docker status
         const response = {
             versionFamily: 1,
-            versionRelease: 'skyportd 1.0.0',
+            versionRelease: 'skyportd ' + config.version,
             online: true,
             remote: config.remote,
             docker: {
@@ -368,7 +368,7 @@ app.get('/', async (req, res) => {
             }
         };
 
-        res.json(response);
+        res.json(response); // the point of this? just use the ws - yeah conn to the ws on nodes page and send that json over ws
     } catch (error) {
         console.error('Error fetching Docker status:', error);
         res.status(500).json({ error: 'Docker is not running - skyportd will not function properly.' });
