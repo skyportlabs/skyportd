@@ -33,9 +33,6 @@ router.post('/create', async (req, res) => {
 
 
     try {
-        // Pull the Docker image if not already available
-        /*await docker.pull(Image);*/
-
         // Define the volume path
         let volumeId = new Date().getTime().toString();
         const volumePath = path.join(__dirname, '../volumes', volumeId); // Using timestamp for unique dir
@@ -87,11 +84,10 @@ router.post('/create', async (req, res) => {
                     
                     response.pipe(fileStream);
                     fileStream.on('finish', () => {
-                        console.log('Datei erfolgreich heruntergeladen.');
                         fileStream.close();
                     });
                 }).on('error', (err) => {
-                    console.error('Fehler beim Herunterladen der Datei:', err);
+                    console.error('Failure with running the container install script:', err);
                 });
             };
 
