@@ -118,10 +118,10 @@ function initializeWebSocketServer(server) {
             }
 
             if (msg.event === 'auth' && msg.args) {
-                authenticateWebSocket(ws, req, msg.args[0], (authenticated, containerId) => {
+                authenticateWebSocket(ws, req, msg.args[0], (authenticated, containerId, volumeId) => {
                     if (authenticated) {
                         isAuthenticated = true;
-                        handleWebSocketConnection(ws, req, containerId);
+                        handleWebSocketConnection(ws, req, containerId, volumeId);
                     } else {
                         ws.send('Authentication failed');
                         ws.close(1008, "Authentication failed");
@@ -167,21 +167,24 @@ function initializeWebSocketServer(server) {
                 ws.send(`\x1b[36;1m[skyportd] \x1b[0mconsole connected!`);
                 const urlParts = req.url.split('/');
                 const containerId = urlParts[2];
+                const volumeId = urlParts[3] || 0;
 
                 if (!containerId) {
                     ws.close(1008, "Container ID not specified");
                     callback(false, null);
                     return;
                 }
-                callback(true, containerId);
+
+                callback(true, containerId, volumeId);
             } else {
                 log.warn('authentication failure on websocket!');
                 callback(false, null);
             }
         }
 
-        function handleWebSocketConnection(ws, req, containerId) {
+        function handleWebSocketConnection(ws, req, containerId, volumeId) {
             const container = docker.getContainer(containerId);
+            const volume = volumeId || 0;
 
             container.inspect(async (err, data) => {
                 if (err) {
@@ -192,7 +195,7 @@ function initializeWebSocketServer(server) {
                 if (req.url.startsWith('/exec/')) {
                     setupExecSession(ws, container);
                 } else if (req.url.startsWith('/stats/')) {
-                    setupStatsStreaming(ws, container);
+                    setupStatsStreaming(ws, container, volume);
                 } else {
                     ws.close(1002, "URL must start with /exec/ or /stats/");
                 }
@@ -224,13 +227,20 @@ function initializeWebSocketServer(server) {
             });
         }
 
-        function setupStatsStreaming(ws, container) {
+        function setupStatsStreaming(ws, container, volumeId) {
             const fetchStats = () => {
                 container.stats({ stream: false }, (err, stats) => {
                     if (err) {
                         ws.send(JSON.stringify({ error: 'Failed to fetch stats' }));
                         return;
                     }
+                    
+                    // Calculate volume size
+                    const volumeSize = getVolumeSize(volumeId);
+                    
+                    // Add volume size to stats object
+                    stats.volumeSize = volumeSize;
+                    
                     ws.send(JSON.stringify(stats));
                 });
             };
@@ -244,7 +254,6 @@ function initializeWebSocketServer(server) {
         }
 
         async function executeCommand(ws, container, command) {
-            log.info('Executing command:', command);
             try {
                 const stream = await container.attach({
                     stream: true,
@@ -293,6 +302,43 @@ function initializeWebSocketServer(server) {
                 }
                 ws.send(`\u001b[1m\u001b[33m[daemon] \u001b[0mdone! new power state: ${action}`);
             });
+        }
+
+        function getVolumeSize(volumeId) {
+            const volumePath = path.join('./volumes', volumeId);
+            try {
+                const totalSize = calculateDirectorySize(volumePath);
+                return formatBytes(totalSize);
+            } catch (err) {
+                log.error(`Error getting volume size for ${volumeId}: ${err}`);
+                return 'Unknown';
+            }
+        }
+
+        function calculateDirectorySize(directoryPath) {
+            let totalSize = 0;
+            const files = fs.readdirSync(directoryPath);
+
+            for (const file of files) {
+                const filePath = path.join(directoryPath, file);
+                const stats = fs.statSync(filePath);
+
+                if (stats.isDirectory()) {
+                    totalSize += calculateDirectorySize(filePath);
+                } else {
+                    totalSize += stats.size;
+                }
+            }
+
+            return totalSize;
+        }
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
         }
     });
 }
