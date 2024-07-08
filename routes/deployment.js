@@ -16,13 +16,6 @@ const https = require('https');
 
 const docker = new Docker({ socketPath: process.env.dockerSocket });
 
-/**
- * Downloads a file from a given URL to a specified directory.
- * @param {string} url - The URL of the file to download.
- * @param {string} dir - The directory to save the file in.
- * @param {string} filename - The name to save the file as.
- * @returns {Promise} A promise that resolves when the file is downloaded.
- */
 const downloadFile = (url, dir, filename) => {
     return new Promise((resolve, reject) => {
         https.get(url, (response) => {
@@ -38,11 +31,6 @@ const downloadFile = (url, dir, filename) => {
     });
 };
 
-/**
- * Downloads multiple files specified in the Scripts.Install array.
- * @param {Array} installScripts - Array of objects containing Uri and Path for each file.
- * @param {string} dir - The directory to save the files in.
- */
 const downloadInstallScripts = async (installScripts, dir) => {
     for (const script of installScripts) {
         try {
@@ -50,6 +38,23 @@ const downloadInstallScripts = async (installScripts, dir) => {
             log.info(`Successfully downloaded ${script.Path}`);
         } catch (err) {
             log.error(`Failed to download ${script.Path}: ${err.message}`);
+        }
+    }
+};
+
+const replaceVariables = async (dir, variables) => {
+    const files = await fs.readdir(dir);
+    for (const file of files) {
+        const filePath = path.join(dir, file);
+        const stats = await fs.stat(filePath);
+        if (stats.isFile()) {
+            let content = await fs.readFile(filePath, 'utf8');
+            for (const [key, value] of Object.entries(variables)) {
+                const regex = new RegExp(`{{${key}}}`, 'g');
+                content = content.replace(regex, value);
+            }
+            await fs.writeFile(filePath, content, 'utf8');
+            log.info(`Variables replaced in ${file}`);
         }
     }
 };
@@ -100,14 +105,24 @@ router.post('/create', async (req, res) => {
         // Start the container
         await container.start();
 
-        log.info('deployment completed! container: ' + container.id)
-        res.status(201).json({ message: 'Container and volume created successfully', containerId: container.id, volumeId });
-
         if (Scripts && Scripts.Install && Array.isArray(Scripts.Install)) {
             const dir = path.join(__dirname, '../volumes/' + volumeId);
             await downloadInstallScripts(Scripts.Install, dir);
+
+            // Prepare variables for replacement
+            const variables = {
+                primaryPort: Object.values(PortBindings)[0][0].HostPort,
+                containerName: container.id.substring(0, 12),
+                timestamp: new Date().toISOString(),
+                randomString: Math.random().toString(36).substring(7)
+            };
+
+            // Replace variables in downloaded files
+            await replaceVariables(dir, variables);
         }
 
+        log.info('deployment completed! container: ' + container.id)
+        res.status(201).json({ message: 'Container and volume created successfully', containerId: container.id, volumeId });
     } catch (err) {
         log.error('deployment failed: ' + err)
         res.status(500).json({ message: err.message });
