@@ -17,6 +17,44 @@ const https = require('https');
 const docker = new Docker({ socketPath: process.env.dockerSocket });
 
 /**
+ * Downloads a file from a given URL to a specified directory.
+ * @param {string} url - The URL of the file to download.
+ * @param {string} dir - The directory to save the file in.
+ * @param {string} filename - The name to save the file as.
+ * @returns {Promise} A promise that resolves when the file is downloaded.
+ */
+const downloadFile = (url, dir, filename) => {
+    return new Promise((resolve, reject) => {
+        https.get(url, (response) => {
+            const fileStream = fs.createWriteStream(path.join(dir, filename));
+            response.pipe(fileStream);
+            fileStream.on('finish', () => {
+                fileStream.close();
+                resolve();
+            });
+        }).on('error', (err) => {
+            reject(err);
+        });
+    });
+};
+
+/**
+ * Downloads multiple files specified in the Scripts.Install array.
+ * @param {Array} installScripts - Array of objects containing Uri and Path for each file.
+ * @param {string} dir - The directory to save the files in.
+ */
+const downloadInstallScripts = async (installScripts, dir) => {
+    for (const script of installScripts) {
+        try {
+            await downloadFile(script.Uri, dir, script.Path);
+            log.info(`Successfully downloaded ${script.Path}`);
+        } catch (err) {
+            log.error(`Failed to download ${script.Path}: ${err.message}`);
+        }
+    }
+};
+
+/**
  * POST /create
  * Creates and starts a new Docker container with specifications provided in the request body.
  * The specifications include Docker image, command, environment variables, port bindings,
@@ -29,20 +67,13 @@ const docker = new Docker({ socketPath: process.env.dockerSocket });
  */
 router.post('/create', async (req, res) => {
     log.info('deployment in progress...')
-    const { Image, Cmd, Env, Ports, Scripts, Memory, Cpu, PortBindings, ConfigFilePath, ConfigFileContent } = req.body;
-
+    const { Image, Cmd, Env, Ports, Scripts, Memory, Cpu, PortBindings } = req.body;
 
     try {
         // Define the volume path
         let volumeId = new Date().getTime().toString();
         const volumePath = path.join(__dirname, '../volumes', volumeId); // Using timestamp for unique dir
         fs.mkdirSync(volumePath, { recursive: true });
-
-        // If ConfigFilePath and ConfigFileContent are provided, create config file inside volume
-        if (ConfigFilePath && ConfigFileContent) {
-            const fullConfigPath = path.join(volumePath, ConfigFilePath);
-            fs.writeFileSync(fullConfigPath, ConfigFileContent);
-        }
 
         // Create the container with the configuration from the request
         const containerOptions = {
@@ -72,28 +103,9 @@ router.post('/create', async (req, res) => {
         log.info('deployment completed! container: ' + container.id)
         res.status(201).json({ message: 'Container and volume created successfully', containerId: container.id, volumeId });
 
-
-        if (Scripts !== undefined) {
-
-        if (Scripts.install) {
+        if (Scripts && Scripts.Install && Array.isArray(Scripts.Install)) {
             const dir = path.join(__dirname, '../volumes/' + volumeId);
-            const URL = Scripts.install.URL;
-            const downloadFile = (url, dir) => {
-                https.get(url, (response) => {
-                    const fileStream = fs.createWriteStream(path.join(dir, Scripts.install.renameto));
-                    
-                    response.pipe(fileStream);
-                    fileStream.on('finish', () => {
-                        fileStream.close();
-                    });
-                }).on('error', (err) => {
-                    console.error('Failure with running the container install script:', err);
-                });
-            };
-
-            downloadFile(URL, dir);
-        }
-
+            await downloadInstallScripts(Scripts.Install, dir);
         }
 
     } catch (err) {
