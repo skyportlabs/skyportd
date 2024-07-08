@@ -66,4 +66,31 @@ router.get('/:id/ports', (req, res) => {
     });
 });
 
+router.get('/:id/delete', (req, res) => {
+    if (!req.params.id) return res.status(400).json({ message: 'Container ID is required' });
+    const container = docker.getContainer(req.params.id);
+    container.remove({ force: true }, (err, data) => {
+        if (err) {
+            return res.status(404).json({ message: "Container not found" });
+        }
+        res.json(data);
+    });
+});
+
+router.get('/purge/all', (req, res) => {
+    docker.listContainers({ all: true }, (err, containers) => {
+        if (err) {
+            return res.status(500).json({ message: err.message });
+        }
+        containers.forEach(container => {
+            docker.getContainer(container.Id).remove({ force: true }, (err, data) => {
+                if (err) {
+                    return res.status(404).json({ message: "Container not found" });
+                }
+                res.json(data);
+            });
+        });
+    });
+});
+
 module.exports = router;
