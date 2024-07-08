@@ -93,7 +93,7 @@ async function init() {
 
 async function createVolumesFolder() {
   try {
-    await fs.mkdir(path.join(__dirname, 'volumes'), { recursive: true });
+    await fs.mkdir(path.join(__dirname, '../volumes'), { recursive: true });
     log.init('volumes folder created successfully');
   } catch (error) {
     console.error('Error creating volumes folder:', error);
