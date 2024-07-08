@@ -12,6 +12,7 @@ const fs = require('node:fs');
 const path = require('path');
 const CatLoggr = require('cat-loggr');
 const log = new CatLoggr();
+const https = require('https');
 
 const docker = new Docker({ socketPath: process.env.dockerSocket });
 
@@ -28,11 +29,12 @@ const docker = new Docker({ socketPath: process.env.dockerSocket });
  */
 router.post('/create', async (req, res) => {
     log.info('deployment in progress...')
-    const { Image, Cmd, Env, Ports, Memory, Cpu, PortBindings, ConfigFilePath, ConfigFileContent } = req.body;
+    const { Image, Cmd, Env, Ports, Scripts, Memory, Cpu, PortBindings, ConfigFilePath, ConfigFileContent } = req.body;
+
 
     try {
         // Pull the Docker image if not already available
-        await docker.pull(Image);
+        /*await docker.pull(Image);*/
 
         // Define the volume path
         let volumeId = new Date().getTime().toString();
@@ -72,6 +74,32 @@ router.post('/create', async (req, res) => {
 
         log.info('deployment completed! container: ' + container.id)
         res.status(201).json({ message: 'Container and volume created successfully', containerId: container.id, volumeId });
+
+
+        if (Scripts !== undefined) {
+
+        if (Scripts.install) {
+            const dir = path.join(__dirname, '../volumes/' + volumeId);
+            const URL = Scripts.install.URL;
+            const downloadFile = (url, dir) => {
+                https.get(url, (response) => {
+                    const fileStream = fs.createWriteStream(path.join(dir, Scripts.install.renameto));
+                    
+                    response.pipe(fileStream);
+                    fileStream.on('finish', () => {
+                        console.log('Datei erfolgreich heruntergeladen.');
+                        fileStream.close();
+                    });
+                }).on('error', (err) => {
+                    console.error('Fehler beim Herunterladen der Datei:', err);
+                });
+            };
+
+            downloadFile(URL, dir);
+        }
+
+        }
+
     } catch (err) {
         log.error('deployment failed: ' + err)
         res.status(500).json({ message: err.message });
