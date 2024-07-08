@@ -164,7 +164,7 @@ function initializeWebSocketServer(server) {
         function authenticateWebSocket(ws, req, password, callback) {
             if (password === config.key) {
                 log.info('successful authentication on ws');
-                ws.send(`\x1b[36;1m[skyportd] \x1b[0mconsole connected!`);
+                ws.send(`\r\n\u001b[33m[skyportd] \x1b[0mconnected!\r\n`);
                 const urlParts = req.url.split('/');
                 const containerId = urlParts[2];
                 const volumeId = urlParts[3] || 0;
