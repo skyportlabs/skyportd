@@ -39,6 +39,7 @@ const { start, createNewVolume } = require('./routes/ftp.js')
 const config = require('./config.json');
 
 const docker = new Docker({ socketPath: process.env.dockerSocket });
+createVolumesFolder(); // or shit will fail
 
 /**
  * Initializes a WebSocket server tied to the HTTP server. This WebSocket server handles real-time
@@ -58,7 +59,6 @@ const log = new CatLoggr();
  */
 console.log(chalk.gray(ascii) + chalk.white(`version v${config.version}\n`));
 init();
-createVolumesFolder();
 seed();
 
 app.use(bodyParser.json());
