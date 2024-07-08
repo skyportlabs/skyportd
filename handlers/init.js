@@ -3,9 +3,11 @@ const Docker = require('dockerode');
 const config = require('../config.json')
 const CatLoggr = require('cat-loggr');
 const log = new CatLoggr();
+const fs = require('fs').promises;
+const path = require('path');
 
 // Initialize Docker connection
-const docker = new Docker({ socketPath: process.env.dockerSocket });
+const docker = new Docker({ socketPath: process.env.dockerSocket }); // do a single connection in index.js or wherever and then use that 1 connection for all ur files rather than making a ton
 
 async function init() {
     try {
@@ -89,4 +91,13 @@ async function init() {
     log.info('done!')
 }
 
-module.exports = { init }
+async function createVolumesFolder() {
+  try {
+    await fs.mkdir(path.join(__dirname, 'volumes'), { recursive: true });
+    log.init('volumes folder created successfully');
+  } catch (error) {
+    console.error('Error creating volumes folder:', error);
+  }
+}
+
+module.exports = { init, createVolumesFolder }
