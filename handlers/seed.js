@@ -12,13 +12,7 @@ async function seed() {
     try {
         createVolumesFolder();
         log.init('retrieving image list from skyport...');
-        // Fetch image configurations from the remote server
-        const response = await axios.get(config.remote + '/images/list', {
-            auth: {
-                username: 'Skyport',
-                password: config.remoteKey
-            }
-        });
+        const response = await axios.get(config.remote + '/images/list');
 
         const images = response.data;
         log.init('pulling images...');
@@ -51,7 +45,6 @@ async function seed() {
         }
     } catch (error) {
         log.error('failed to retrieve image list from remote! the panel might be down. error:', error.message);
-        // Exit if the server connection cannot be established
         process.exit();
     }
 

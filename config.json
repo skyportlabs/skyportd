@@ -1,9 +1,7 @@
 {
-    "_note1": "The key below is used for Skyport Daemon to access the Panel to retrieve images and instances. You can set this key (temporarily) in your Panel's config.json file.",
+    "_note1": "WARNING: You do not need to touch the following values. Skyport Daemon will automatically set them.",
     "remote": "http://localhost:3001",
-    "remoteKey": "skyport_default_key",
-
-    "_note2": "This is the 2nd key, used by the Panel for accessing the Daemon (also temporarily). You should set this as the key when you create a node on your Panel.",
+    "remoteKey": "",
     "key": "skyportd_1",
 
     "_note3": "Other configuration options below. Hostname must be set for FTP to return the correct info.",
