@@ -35,7 +35,7 @@ const ascii = fs.readFileSync('./handlers/ascii.txt', 'utf8');
 const { exec } = require('child_process');
 const { init, createVolumesFolder } = require('./handlers/init.js');
 const { seed } = require('./handlers/seed.js');
-const { start, createNewVolume } = require('./routes/FTP.js')
+const { start, createNewVolume } = require('./routes/InstanceFTP.js')
 const config = require('./config.json');
 
 const docker = new Docker({ socketPath: process.env.dockerSocket });
@@ -68,8 +68,8 @@ app.use(basicAuth({
 
 const instanceRouter = require('./routes/Instance.js');
 const deploymentRouter = require('./routes/Deploy.js');
-const filesystemRouter = require('./routes/Filesystem.js');
-const archiveRouter = require('./routes/Archive.js');
+const filesystemRouter = require('./routes/Volume.js');
+const archiveRouter = require('./routes/ArchiveVolume.js');
 const powerRouter = require('./routes/PowerActions.js');
 
 // use routes
