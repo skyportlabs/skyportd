@@ -127,4 +127,62 @@ router.delete('/:id', async (req, res) => {
     }
 });
 
+router.put('/edit/:id', async (req, res) => {
+    const { id } = req.params;
+    const { Image, Memory, Cpu, VolumeId } = req.body;
+
+    try {
+        log.info(`Editing container: ${id}`);
+
+        // Get the existing container
+        const container = docker.getContainer(id);
+        const containerInfo = await container.inspect();
+
+        // Extract existing configuration
+        const existingConfig = containerInfo.Config;
+        const existingHostConfig = containerInfo.HostConfig;
+
+        // Prepare new configuration
+        const newContainerOptions = {
+            Image: Image || existingConfig.Image,
+            ExposedPorts: existingConfig.ExposedPorts,
+            Cmd: existingConfig.Cmd,
+            Env: existingConfig.Env,
+            AttachStdout: true,
+            AttachStderr: true,
+            AttachStdin: true,
+            Tty: true,
+            OpenStdin: true,
+            HostConfig: {
+                PortBindings: existingHostConfig.PortBindings,
+                Binds: [`${path.join(__dirname, '../volumes', VolumeId)}:/app/data`],
+                Memory: Memory ? Memory * 1024 * 1024 : existingHostConfig.Memory,
+                CpuCount: Cpu || existingHostConfig.CpuCount
+            }
+        };
+
+        // Stop and remove the existing container
+        log.info(`Stopping container: ${id}`);
+        await container.stop();
+        log.info(`Removing container: ${id}`);
+        await container.remove();
+
+        // Create and start a new container with the updated configuration
+        log.info('Creating new container with updated configuration');
+        const newContainer = await docker.createContainer(newContainerOptions);
+        await newContainer.start();
+
+        log.info(`Edit completed! New container ID: ${newContainer.id}`);
+        res.status(200).json({ 
+            message: 'Container edited successfully', 
+            oldContainerId: id, 
+            newContainerId: newContainer.id 
+        });
+
+    } catch (err) {
+        log.error(`Edit failed: ${err}`);
+        res.status(500).json({ message: err.message });
+    }
+});
+
 module.exports = router;
