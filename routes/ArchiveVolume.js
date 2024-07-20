@@ -5,6 +5,7 @@ const fsPromises = fs.promises;
 const path = require('path');
 const archiver = require('archiver');
 const unzipper = require('unzipper');
+const mime = require('mime-types');
 
 /**
  * Ensures the target path is within the specified base directory, preventing directory traversal attacks.
@@ -48,11 +49,7 @@ router.get('/:id/archives', async (req, res) => {
     const archivePath = path.join(__dirname, '../archives', id);
 
     try {
-        try {
-            await fsPromises.access(archivePath, fs.constants.F_OK);
-        } catch (err) {
-            return res.json({ archives: [] });
-        }
+        await fsPromises.access(archivePath, fs.constants.F_OK);
 
         const files = await fsPromises.readdir(archivePath, { withFileTypes: true });
 
@@ -69,13 +66,16 @@ router.get('/:id/archives', async (req, res) => {
 
         res.json({ archives: detailedFiles });
     } catch (err) {
-        console.error('Error fetching archives:', err.message);
-        res.status(500).json({ message: 'An error occurred while fetching archives.' });
+        if (err.code === 'ENOENT') {
+            res.json({ archives: [] });
+        } else {
+            res.status(500).json({ message: err.message });
+        }
     }
 });
 
 /**
- * POST /:id/archives/create
+ * POST /:id/archives/:volumeId/create
  * Creates an archive of the specified volume and stores it in the archives directory.
  */
 router.post('/:id/archives/:volumeId/create', async (req, res) => {
@@ -99,25 +99,48 @@ router.post('/:id/archives/:volumeId/create', async (req, res) => {
         });
 
         output.on('error', (err) => {
-            console.error('Error creating archive:', err.message);
-            res.status(500).json({ message: 'An error occurred while creating the archive.' });
+            res.status(500).json({ message: err.message });
         });
 
         archive.on('error', (err) => {
             output.destroy();
-            console.error('Error with archiver:', err.message);
-            res.status(500).json({ message: 'An error occurred with the archiving process.' });
+            res.status(500).json({ message: err.message });
         });
 
         archive.pipe(output);
         archive.directory(volumePath, false);
         await archive.finalize();
     } catch (err) {
-        console.error('Error creating archive:', err.message);
-        res.status(500).json({ message: 'An error occurred while creating the archive.' });
+        res.status(500).json({ message: err.message });
     }
 });
 
+/**
+ * GET /:id/archives/download/:archiveName
+ * Allows downloading of the specified archive file.
+ */
+router.get('/:id/archives/download/:archiveName', async (req, res) => {
+    const { id, archiveName } = req.params;
+    const archivePath = path.join(__dirname, '../archives', id, archiveName);
+
+    try {
+        await fsPromises.access(archivePath, fs.constants.F_OK);
+
+        const mimeType = mime.lookup(archivePath) || 'application/octet-stream';
+
+        res.setHeader('Content-Disposition', `attachment; filename="${archiveName}"`);
+        res.setHeader('Content-Type', mimeType);
+
+        const fileStream = fs.createReadStream(archivePath);
+        fileStream.pipe(res);
+    } catch (err) {
+        if (err.code === 'ENOENT') {
+            res.status(404).json({ message: 'Archive not found' });
+        } else {
+            res.status(500).json({ message: err.message });
+        }
+    }
+});
 
 /**
  * POST /:id/archives/delete/:archiveName
@@ -134,14 +157,13 @@ router.post('/:id/archives/delete/:archiveName', async (req, res) => {
         if (err.code === 'ENOENT') {
             res.status(404).json({ message: 'Archive not found' });
         } else {
-            console.error('Error deleting archive:', err.message);
-            res.status(500).json({ message: 'An error occurred while deleting the archive.' });
+            res.status(500).json({ message: err.message });
         }
     }
 });
 
 /**
- * POST /:id/archives/rollback/:archiveName
+ * POST /:id/archives/rollback/:volumeId/:archiveName
  * Rolls back the specified volume to the state of the given archive.
  */
 router.post('/:id/archives/rollback/:volumeId/:archiveName', async (req, res) => {
@@ -150,16 +172,8 @@ router.post('/:id/archives/rollback/:volumeId/:archiveName', async (req, res) =>
     const archivePath = path.join(__dirname, '../archives', id, archiveName);
 
     try {
-        try {
-            const files = await fsPromises.readdir(volumePath);
-            await Promise.all(files.map(file => fsPromises.rm(path.join(volumePath, file), { recursive: true, force: true })));
-        } catch (err) {
-            if (err.code === 'ENOENT') {
-                console.warn('Volume directory not found. No files to delete.');
-            } else {
-                throw err;
-            }
-        }
+        const files = await fsPromises.readdir(volumePath);
+        await Promise.all(files.map(file => fsPromises.rm(path.join(volumePath, file), { recursive: true, force: true })));
 
         const zipStream = fs.createReadStream(archivePath);
         const extractStream = unzipper.Extract({ path: volumePath });
@@ -171,16 +185,10 @@ router.post('/:id/archives/rollback/:volumeId/:archiveName', async (req, res) =>
         });
 
         extractStream.on('error', (err) => {
-            console.error('Error extracting archive:', err.message);
-            res.status(500).json({ message: 'An error occurred while extracting the archive.' });
+            res.status(500).json({ message: err.message });
         });
     } catch (err) {
-        if (err.code === 'ENOENT') {
-            res.status(404).json({ message: 'Archive not found' });
-        } else {
-            console.error('Error rolling back volume:', err.message);
-            res.status(500).json({ message: 'An error occurred while rolling back the volume.' });
-        }
+        res.status(500).json({ message: err.message });
     }
 });
 
