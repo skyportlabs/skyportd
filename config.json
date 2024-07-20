@@ -4,7 +4,7 @@
   "key": "37ae8d24ae8017866740fdf48b77babaa58008a246ac50ccbe3f08468951096d",
   "_note3": "Other configuration options below. Hostname must be set for FTP to return the correct info.",
   "port": 3000,
-  "version": "0.1.0-beta6",
+  "version": "0.1.0-beta8",
   "ftp": {
     "ip": "localhost",
     "port": 3002
