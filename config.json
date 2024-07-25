@@ -5,6 +5,11 @@
   "_note3": "Other configuration options below. Hostname must be set for FTP to return the correct info.",
   "port": 3000,
   "version": "0.1.0-beta8",
+    "mysql": {
+    "host": "localhost",
+    "user": "root",
+    "password": ""
+  },
   "ftp": {
     "ip": "localhost",
     "port": 3002

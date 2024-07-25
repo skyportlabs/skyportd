@@ -36,6 +36,7 @@ const { exec } = require('child_process');
 const { init, createVolumesFolder } = require('./handlers/init.js');
 const { seed } = require('./handlers/seed.js');
 const { start, createNewVolume } = require('./routes/InstanceFTP.js')
+const { createDatabaseAndUser } = require('./routes/InstanceDB.js');
 const config = require('./config.json');
 
 const docker = new Docker({ socketPath: process.env.dockerSocket });
@@ -96,6 +97,21 @@ app.get('/ftp/info/:id', (req, res) => {
         res.json(JSON.parse(data));
     });
 });
+
+app.post('/database/create/:name', async (req, res) => {
+    try {
+        const dbName = req.params.name;
+        const credentials = await createDatabaseAndUser(dbName);
+        res.status(200).json({
+            message: `Database ${dbName} created successfully`,
+            credentials
+        });
+    } catch (error) {
+        console.error('Error creating database:', error);
+        res.status(500).json({ error: 'Failed to create database' });
+    }
+});
+
 
 /**
  * Initializes a WebSocket server tied to the HTTP server. This WebSocket server handles real-time
@@ -366,11 +382,16 @@ app.get('/', async (req, res) => {
             versionRelease: 'skyportd ' + config.version,
             online: true,
             remote: config.remote,
+            mysql: {
+              host: config.mysql.host,
+              user: config.mysql.user,
+              password: config.mysql.password
+            },
             docker: {
-                status: isDockerRunning ? 'running' : 'not running',
-                systemInfo: dockerInfo
+              status: isDockerRunning ? 'running' : 'not running',
+              systemInfo: dockerInfo
             }
-        };
+          };
 
         res.json(response); // the point of this? just use the ws - yeah conn to the ws on nodes page and send that json over ws
     } catch (error) {
