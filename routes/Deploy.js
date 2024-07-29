@@ -63,10 +63,10 @@ const replaceVariables = async (dir, variables) => {
 
 router.post('/create', async (req, res) => {
     log.info('deployment in progress...')
-    const { Image, Cmd, Env, Ports, Scripts, Memory, Cpu, PortBindings } = req.body;
+    const { Image, Id, Cmd, Env, Ports, Scripts, Memory, Cpu, PortBindings } = req.body;
 
     try {
-        let volumeId = new Date().getTime().toString();
+        let volumeId = Id;
         const volumePath = path.join(__dirname, '../volumes', volumeId);
         await fs.mkdir(volumePath, { recursive: true });
 
