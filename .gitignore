@@ -2,3 +2,5 @@ node_modules/
 volumes/
 tmp/
 ftp/
+archives/
+package-lock.json

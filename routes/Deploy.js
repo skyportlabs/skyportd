@@ -83,7 +83,7 @@ router.post('/create', async (req, res) => {
                 Binds: [`${volumePath}:/app/data`],
                 Memory: Memory * 1024 * 1024,
                 CpuCount: Cpu,
-                NetworkNode: 'host'
+                NetworkMode: 'host'
             }
         };
 
@@ -159,7 +159,7 @@ router.put('/edit/:id', async (req, res) => {
                 Binds: [`${path.join(__dirname, '../volumes', VolumeId)}:/app/data`],
                 Memory: Memory ? Memory * 1024 * 1024 : existingHostConfig.Memory,
                 CpuCount: Cpu || existingHostConfig.CpuCount,
-                NetworkNode: 'host'
+                NetworkMode: 'host'
             }
         };
 
