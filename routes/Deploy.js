@@ -128,6 +128,44 @@ router.delete('/:id', async (req, res) => {
     }
 });
 
+router.post('/redeploy/:id', async (req, res) => {
+    const { id } = req.params;
+    const container = docker.getContainer(id);
+    try {
+
+        await container.remove();
+
+        const { Image, Id, Ports, Memory, Cpu, PortBindings, Env } = req.body;
+        const volumePath = path.join(__dirname, '../volumes', Id);
+
+        const containerOptions = {
+            Image,
+            ExposedPorts: Ports,
+            AttachStdout: true,
+            AttachStderr: true,
+            AttachStdin: true,
+            Tty: true,
+            OpenStdin: true,
+            HostConfig: {
+                PortBindings: PortBindings,
+                Binds: [`${volumePath}:/app/data`],
+                Memory: Memory * 1024 * 1024,
+                CpuCount: Cpu,
+                NetworkMode: 'host'
+            }
+        };
+
+        if (Env) containerOptions.Env = Env;
+
+
+        const newContainer = await docker.createContainer(containerOptions);
+        await newContainer.start();
+        res.status(200).json({ message: 'Container ReDeloyed successfully', containerId: newContainer.id });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
 router.put('/edit/:id', async (req, res) => {
     const { id } = req.params;
     const { Image, Memory, Cpu, VolumeId } = req.body;
