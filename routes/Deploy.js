@@ -33,16 +33,28 @@ const downloadFile = (url, dir, filename) => {
     });
 };
 
-const downloadInstallScripts = async (installScripts, dir) => {
+const downloadInstallScripts = async (installScripts, dir, variables) => {
+    const parsedVariables = JSON.parse(variables);
+
     for (const script of installScripts) {
         try {
-            await downloadFile(script.Uri, dir, script.Path);
+            let updatedUri = script.Uri;
+
+            if (parsedVariables) {
+                for (const [key, value] of Object.entries(parsedVariables)) {
+                    updatedUri = updatedUri.replace(`{{${key}}}`, value);
+                    log.info(`Replaced ${key} with ${value} in ${updatedUri}`);
+                }
+            }
+
+            await downloadFile(updatedUri, dir, script.Path);
             log.info(`Successfully downloaded ${script.Path}`);
         } catch (err) {
             log.error(`Failed to download ${script.Path}: ${err.message}`);
         }
     }
 };
+
 
 const replaceVariables = async (dir, variables) => {
     const files = await fs.readdir(dir);
@@ -64,6 +76,7 @@ const replaceVariables = async (dir, variables) => {
 router.post('/create', async (req, res) => {
     log.info('deployment in progress...')
     const { Image, Id, Cmd, Env, Ports, Scripts, Memory, Cpu, PortBindings } = req.body;
+    const variables2 = req.body.variables;
 
     try {
         let volumeId = Id;
@@ -90,6 +103,7 @@ router.post('/create', async (req, res) => {
         if (Cmd) containerOptions.Cmd = Cmd;
         if (Env) containerOptions.Env = Env;
 
+
         const container = await docker.createContainer(containerOptions);
         await container.start();
 
@@ -98,7 +112,7 @@ router.post('/create', async (req, res) => {
 
         if (Scripts && Scripts.Install && Array.isArray(Scripts.Install)) {
             const dir = path.join(__dirname, '../volumes', volumeId);
-            await downloadInstallScripts(Scripts.Install, dir);
+            await downloadInstallScripts(Scripts.Install, dir, variables2);
 
             // Prepare variables for replacement
             const variables = {
