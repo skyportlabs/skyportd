@@ -82,7 +82,8 @@ router.post('/create', async (req, res) => {
                 PortBindings: PortBindings,
                 Binds: [`${volumePath}:/app/data`],
                 Memory: Memory * 1024 * 1024,
-                CpuCount: Cpu
+                CpuCount: Cpu,
+                NetworkNode: 'host'
             }
         };
 
@@ -157,7 +158,8 @@ router.put('/edit/:id', async (req, res) => {
                 PortBindings: existingHostConfig.PortBindings,
                 Binds: [`${path.join(__dirname, '../volumes', VolumeId)}:/app/data`],
                 Memory: Memory ? Memory * 1024 * 1024 : existingHostConfig.Memory,
-                CpuCount: Cpu || existingHostConfig.CpuCount
+                CpuCount: Cpu || existingHostConfig.CpuCount,
+                NetworkNode: 'host'
             }
         };
 
