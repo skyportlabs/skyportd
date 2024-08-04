@@ -1,10 +1,10 @@
 {
   "_note1": "WARNING: You do not need to touch the following values. Skyport Daemon will automatically set them.",
   "remote": "http://localhost:3001",
-  "key": "c6b4727268bf9222f58867166457395f84c4601222b15755ed3d7d1f7cfa3723",
+  "key": "9ffebe13a92ba3bc191b74922f9136255c2ad3b89414a0a1882f496b4e5079b0",
   "_note3": "Other configuration options below. Hostname must be set for FTP to return the correct info.",
-  "port": 3000,
-  "version": "0.2.0-beta1",
+  "port": 3002,
+  "version": "0.2.0",
   "mysql": {
     "host": "localhost",
     "user": "root",
@@ -12,6 +12,6 @@
   },
   "ftp": {
     "ip": "localhost",
-    "port": 3002
+    "port": 3003
   }
 }
