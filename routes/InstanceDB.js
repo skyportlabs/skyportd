@@ -22,7 +22,7 @@ async function createDatabaseAndUser(dbName) {
     let connection;
     const userName = `user_${dbName}`;
     const password = generatePassword();
-    const credentials = { dbName, userName, password };
+    const credentials = { dbName, userName, password, host: config.mysql.host };
 
     try {
         connection = await mysql.createConnection({
