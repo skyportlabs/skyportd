@@ -361,10 +361,17 @@ router.delete('/:id/files/delete/:filename', async (req, res) => {
     const { id, filename } = req.params;
     const volumePath = path.join(__dirname, '../volumes', id);
     const subPath = req.query.path || '';
-    
+
     try {
         const filePath = safePath(path.join(volumePath, subPath), filename);
-        await fs.unlink(filePath);
+        const stats = await fs.lstat(filePath);
+
+        if (stats.isDirectory()) {
+            await fs.rm(filePath, { recursive: true, force: true });
+        } else {
+            await fs.unlink(filePath);
+        }
+
         res.json({ message: 'File deleted successfully' });
     } catch (err) {
         res.status(500).json({ message: err.message });
