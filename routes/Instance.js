@@ -8,6 +8,8 @@
 const express = require('express');
 const router = express.Router();
 const Docker = require('dockerode');
+const fs = require('fs');
+const path = require('path');
 
 const docker = new Docker({ socketPath: process.env.dockerSocket });
 
@@ -22,12 +24,12 @@ const docker = new Docker({ socketPath: process.env.dockerSocket });
  * @returns {Response} JSON response containing an array of all containers or an error message.
  */
 router.get('/', (req, res) => {
-    docker.listContainers({ all: true }, (err, containers) => {
-        if (err) {
-            return res.status(500).json({ message: err.message });
-        }
-        res.json(containers);
-    });
+  docker.listContainers({ all: true }, (err, containers) => {
+    if (err) {
+      return res.status(500).json({ message: err.message });
+    }
+    res.json(containers);
+  });
 });
 
 /**
@@ -42,55 +44,64 @@ router.get('/', (req, res) => {
  * @returns {Response} JSON response with detailed container information or an error message indicating the container was not found.
  */
 router.get('/:id', (req, res) => {
-    if (req.params.id) return res.send('no id')
-    const container = docker.getContainer(req.params.id);
-    container.inspect((err, data) => {
-        if (err) {
-            return res.status(404).json({ message: "Container not found" });
-        }
-        res.json(data);
-    });
+  if (req.params.id) return res.send('no id');
+  const container = docker.getContainer(req.params.id);
+  container.inspect((err, data) => {
+    if (err) {
+      return res.status(404).json({ message: 'Container not found' });
+    }
+    res.json(data);
+  });
 });
 
 // List all ports for a specific Docker container
 router.get('/:id/ports', (req, res) => {
-    if (!req.params.id) return res.status(400).json({ message: 'Container ID is required' });
-    const container = docker.getContainer(req.params.id);
-    container.inspect((err, data) => {
-        if (err) {
-            return res.status(404).json({ message: "Container not found" });
-        }
-        const ports = data.NetworkSettings.Ports || {};
-        const portList = Object.keys(ports).map(key => ({ port: key }));
-        res.json(portList);
-    });
+  if (!req.params.id) return res.status(400).json({ message: 'Container ID is required' });
+  const container = docker.getContainer(req.params.id);
+  container.inspect((err, data) => {
+    if (err) {
+      return res.status(404).json({ message: 'Container not found' });
+    }
+    const ports = data.NetworkSettings.Ports || {};
+    const portList = Object.keys(ports).map(key => ({ port: key }));
+    res.json(portList);
+  });
 });
 
-router.get('/:id/delete', (req, res) => {
-    if (!req.params.id) return res.status(400).json({ message: 'Container ID is required' });
-    const container = docker.getContainer(req.params.id);
-    container.remove({ force: true }, (err, data) => {
-        if (err) {
-            return res.status(404).json({ message: "Container not found" });
-        }
-        res.json(data);
-    });
+router.get('/:id/delete', async (req, res) => {
+  if (!req.params.id) return res.status(400).json({ message: 'Container ID is required' });
+  const container = docker.getContainer(req.params.id);
+
+  const { Name } = await container.inspect();
+  const nameWithoutSlash = Name.slice(0, 1) === '/' ? Name.slice(1) : Name;
+
+  const volumeDir = path.join(__dirname, '../volumes', nameWithoutSlash);
+
+  container.remove({ force: true }, async (err, data) => {
+    if (err) {
+      return res.status(404).json({ message: 'Container not found' });
+    }
+
+    res.json(data);
+  });
+
+  fs.rmSync(volumeDir, { force: true, recursive: true });
 });
 
 router.get('/purge/all', (req, res) => {
-    docker.listContainers({ all: true }, (err, containers) => {
+  docker.listContainers({ all: true }, (err, containers) => {
+    if (err) {
+      return res.status(500).json({ message: err.message });
+    }
+    containers.forEach(container => {
+      docker.getContainer(container.Id).remove({ force: true }, (err, data) => {
         if (err) {
-            return res.status(500).json({ message: err.message });
+          return res.status(404).json({ message: 'Container not found' });
         }
-        containers.forEach(container => {
-            docker.getContainer(container.Id).remove({ force: true }, (err, data) => {
-                if (err) {
-                    return res.status(404).json({ message: "Container not found" });
-                }
-                res.json(data);
-            });
-        });
+        res.json(data);
+      });
     });
+  });
 });
 
 module.exports = router;
