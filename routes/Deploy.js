@@ -84,6 +84,7 @@ router.post('/create', async (req, res) => {
         await fs.mkdir(volumePath, { recursive: true });
 
         const containerOptions = {
+            name: volumeId,
             Image,
             ExposedPorts: Ports,
             AttachStdout: true,
@@ -102,7 +103,6 @@ router.post('/create', async (req, res) => {
 
         if (Cmd) containerOptions.Cmd = Cmd;
         if (Env) containerOptions.Env = Env;
-
 
         const container = await docker.createContainer(containerOptions);
         await container.start();
@@ -125,7 +125,6 @@ router.post('/create', async (req, res) => {
             // Replace variables in downloaded files
             await replaceVariables(dir, variables);
         }
-
     } catch (err) {
         log.error('deployment failed: ' + err)
         res.status(500).json({ message: err.message });
