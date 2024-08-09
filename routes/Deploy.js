@@ -94,7 +94,7 @@ router.post('/create', async (req, res) => {
             OpenStdin: true,
             HostConfig: {
                 PortBindings: PortBindings,
-                Binds: [`${volumePath}:/app/data`],
+                Binds: [`${volumePath}:/home/container`],
                 Memory: Memory * 1024 * 1024,
                 CpuCount: Cpu,
                 NetworkMode: 'host'
@@ -161,7 +161,7 @@ router.post('/redeploy/:id', async (req, res) => {
             OpenStdin: true,
             HostConfig: {
                 PortBindings: PortBindings,
-                Binds: [`${volumePath}:/app/data`],
+                Binds: [`${volumePath}:/home/container`],
                 Memory: Memory * 1024 * 1024,
                 CpuCount: Cpu,
                 NetworkMode: 'host'
@@ -207,7 +207,7 @@ router.put('/edit/:id', async (req, res) => {
             OpenStdin: true,
             HostConfig: {
                 PortBindings: existingHostConfig.PortBindings,
-                Binds: [`${path.join(__dirname, '../volumes', VolumeId)}:/app/data`],
+                Binds: [`${path.join(__dirname, '../volumes', VolumeId)}:/home/container`],
                 Memory: Memory ? Memory * 1024 * 1024 : existingHostConfig.Memory,
                 CpuCount: Cpu || existingHostConfig.CpuCount,
                 NetworkMode: 'host'
