@@ -28,13 +28,13 @@ function safePath(base, target) {
 function getFilePurpose(file) {
     const extension = path.extname(file).toLowerCase();
     const purposes = {
-        programming: ['.py', '.java', '.c', '.cpp', '.h', '.hpp', '.cs', '.go', '.rb', '.php', '.swift', '.kt', '.rs', '.scala', '.groovy'],
+        programming: ['.py', '.java', '.c', '.cpp', '.h', '.hpp', '.cs', '.go', '.rb', '.php', '.swift', '.kt', '.rs', '.scala', '.groovy', '.lua'],
         webDevelopment: ['.html', '.htm', '.css', '.scss', '.sass', '.less', '.js', '.ts', '.jsx', '.tsx', '.json', '.xml', '.svg'],
         textDocument: ['.txt', '.md', '.rtf', '.log'],
         configuration: ['.ini', '.yaml', '.yml', '.toml', '.cfg', '.conf', '.properties'],
         database: ['.sql'],
         script: ['.sh', '.bash', '.ps1', '.bat', '.cmd'],
-        document: ['.tex', '.bib', '.markdown'],
+        document: ['.tex', '.bib', '.markdown', '.conf'],
     };
 
     for (const [purpose, extensions] of Object.entries(purposes)) {
@@ -61,7 +61,7 @@ function isEditable(file) {
         
         // Programming languages
         '.py', '.java', '.c', '.cpp', '.h', '.hpp', '.cs', '.go',
-        '.rb', '.php', '.swift', '.kt', '.rs', '.scala', '.groovy',
+        '.rb', '.php', '.swift', '.kt', '.rs', '.scala', '.groovy', '.lua',
         
         // Scripting
         '.sh', '.bash', '.ps1', '.bat', '.cmd',
@@ -76,7 +76,7 @@ function isEditable(file) {
         '.sql',
         
         // Others
-        '.gitignore', '.env', '.htaccess'
+        '.gitignore', '.env', '.htaccess', '.conf'
     ];
     
     return editableExtensions.includes(path.extname(file).toLowerCase());
