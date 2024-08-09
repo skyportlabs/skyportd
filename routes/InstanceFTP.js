@@ -121,8 +121,9 @@ const createServer = () => {
         user ? callback(null, user.root) : callback(new Error('No such user'), '/');
       }
     },
+    // Add to open 100 ports to be able to have 100 clients connected simultaneously
     pasvPortRangeStart: 1025,
-    pasvPortRangeEnd: 1050,
+    pasvPortRangeEnd: 1125,
     tlsOptions: options.tls,
     allowUnauthorizedTls: true,
     useWriteFile: false,
