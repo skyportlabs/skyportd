@@ -324,35 +324,39 @@ function initializeWebSocketServer(server) {
             });
         }
 
-        function getVolumeSize(volumeId) {
-            const volumePath = path.join('./volumes', volumeId);
-            try {
-                const totalSize = calculateDirectorySize(volumePath);
-                return formatBytes(totalSize);
-            } catch (err) {
-                log.error(`Error getting volume size for ${volumeId}: ${err}`);
-                return 'Unknown';
-            }
+function getVolumeSize(volumeId) {
+    const volumePath = path.join('./volumes', volumeId);
+    try {
+        const totalSize = calculateDirectorySize(volumePath, 0);
+        return formatBytes(totalSize);
+    } catch (err) {
+        log.error(`Error getting volume size for ${volumeId}: ${err}`);
+        return 'Unknown';
+    }
+}
+
+function calculateDirectorySize(directoryPath, currentDepth) {
+    if (currentDepth >= 500) {
+        log.warn(`Maximum depth reached at ${directoryPath}`);
+        return 0;
+    }
+
+    let totalSize = 0;
+    const files = fs.readdirSync(directoryPath);
+    for (const file of files) {
+        const filePath = path.join(directoryPath, file);
+        const stats = fs.statSync(filePath);
+        if (stats.isDirectory()) {
+            totalSize += calculateDirectorySize(filePath, currentDepth + 1);
+        } else {
+            totalSize += stats.size;
         }
+    }
+    return totalSize;
+}
 
-        function calculateDirectorySize(directoryPath) {
-            let totalSize = 0;
-            const files = fs.readdirSync(directoryPath);
+// fixed in 0.2.2 sam
 
-            for (const file of files) {
-                const filePath = path.join(directoryPath, file);
-                const stats = fs.statSync(filePath);
-
-                if (stats.isDirectory()) {
-                    totalSize += calculateDirectorySize(filePath);
-                } else {
-                    totalSize += stats.size;
-                }
-            }
-
-            return totalSize;
-        }
-        // i can make 10000 .txt files with nothing in ur daemon will crash from oom bcz how ur looping thru stuff
         function formatBytes(bytes) {
             if (bytes === 0) return '0 Bytes';
             const k = 1024;
