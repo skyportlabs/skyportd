@@ -247,26 +247,35 @@ function initializeWebSocketServer(server) {
             });
         }
 
-        function setupStatsStreaming(ws, container, volumeId) {
-            const fetchStats = () => {
-                container.stats({ stream: false }, (err, stats) => {
-                    if (err) {
-                        ws.send(JSON.stringify({ error: 'Failed to fetch stats' }));
-                        return;
-                    }
-                    
+        async function setupStatsStreaming(ws, container, volumeId) {
+            const fetchStats = async () => {
+                try {
+                    const stats = await new Promise((resolve, reject) => {
+                        container.stats({ stream: false }, (err, stats) => {
+                            if (err) {
+                                reject(new Error('Failed to fetch stats'));
+                            } else {
+                                resolve(stats);
+                            }
+                        });
+                    });
+        
                     // Calculate volume size
-                    const volumeSize = getVolumeSize(volumeId);
-                    
+                    const volumeSize = await getVolumeSize(volumeId);
+        
                     // Add volume size to stats object
                     stats.volumeSize = volumeSize;
-                    
+        
                     ws.send(JSON.stringify(stats));
-                });
+                } catch (error) {
+                    ws.send(JSON.stringify({ error: error.message }));
+                }
             };
-            fetchStats();
-            const statsInterval = setInterval(fetchStats, 3000); // oh my. please just listen to the docker stream and whenever docker gives u smt then broadcast it, u will rape the nodes this way
-
+        
+            await fetchStats();
+        
+            const statsInterval = setInterval(fetchStats, 2000);
+        
             ws.on('close', () => {
                 clearInterval(statsInterval);
                 log.info('WebSocket client disconnected');
@@ -324,16 +333,15 @@ function initializeWebSocketServer(server) {
             });
         }
 
-function getVolumeSize(volumeId) {
-    const volumePath = path.join('./volumes', volumeId);
-    try {
-        const totalSize = calculateDirectorySize(volumePath, 0);
-        return formatBytes(totalSize);
-    } catch (err) {
-        log.error(`Error getting volume size for ${volumeId}: ${err}`);
-        return 'Unknown';
-    }
-}
+        async function getVolumeSize(volumeId) {
+            const volumePath = path.join('./volumes', volumeId);
+            try {
+                const totalSize = await calculateDirectorySize(volumePath);
+                return formatBytes(totalSize);
+            } catch (err) {
+                return 'Unknown';
+            }
+        }
 
 function calculateDirectorySize(directoryPath, currentDepth) {
     if (currentDepth >= 500) {
