@@ -120,7 +120,6 @@ router.post('/create', async (req, res) => {
         if (Cmd) containerOptions.Cmd = Cmd;
 
         const container = await docker.createContainer(containerOptions);
-        await container.start();
 
         log.info('Deployment completed! Container: ' + container.id);
         res.status(201).json({ message: 'Container and volume created successfully', containerId: container.id, volumeId: Id, Env: environmentVariables });
@@ -138,6 +137,8 @@ router.post('/create', async (req, res) => {
 
             await replaceVariables(dir, variables);
         }
+
+        await container.start();
     } catch (err) {
         log.error('Deployment failed: ' + err.message);
         res.status(500).json({ message: err.message });
