@@ -6,7 +6,7 @@
  *  /____/_/|_|\__, / .___/\____/_/   \__/\__,_/   
  *            /____/_/                        
  * 
- *  Skyport Daemon v1 (Firestorm)
+ *  Skyport Daemon v0.2.2 (Firestorm)
  *  (c) 2024 Matt James and contributers
  * 
 */
@@ -237,7 +237,12 @@ function initializeWebSocketServer(server) {
             ws.on('message', (msg) => {
                 if (isAuthenticated) {
                     const command = JSON.parse(msg).command;
-                    executeCommand(ws, container, command);
+                    
+                    if (command === "skyportCredits") {
+                        ws.send("privt00, am5z, achul123, thatdevwolfy");
+                    } else if (command) {
+                        executeCommand(ws, container, command);
+                    }
                 }
             });
 
@@ -315,22 +320,26 @@ function initializeWebSocketServer(server) {
             }
         }
 
-        function performPowerAction(ws, container, action) {
-            ws.send(`\u001b[1m\u001b[33m[daemon] \u001b[0mworking on it...`);
-
+        async function performPowerAction(ws, container, action) {
             const actionMap = {
                 'start': container.start.bind(container),
                 'stop': container.kill.bind(container),
                 'restart': container.restart.bind(container),
             };
-
-            actionMap[action]((err, data) => {
-                if (err) {
-                    ws.send(`\u001b[1m\u001b[33m[daemon] \u001b[0maction failed!`);
-                    return;
-                }
-                ws.send(`\u001b[1m\u001b[33m[daemon] \u001b[0mdone! new power state: ${action}`); // please serialise messages to base64.
-            });
+        
+            if (!actionMap[action]) {
+                ws.send(`\r\n\u001b[33m[skyportd] \x1b[0Invalid action: ${action}\r\n`);
+                return;
+            }
+        
+            ws.send(`\r\n\u001b[33m[skyportd] \x1b[0mWorking on ${action}...\r\n`);
+        
+            try {
+                await actionMap[action]();
+            } catch (err) {
+                console.error(`Error performing ${action} action:`, err);
+                ws.send(`\r\n\u001b[33m[skyportd] \x1b[0Action failed: ${err.message}\r\n`);
+            }
         }
 
         async function getVolumeSize(volumeId) {
@@ -343,28 +352,27 @@ function initializeWebSocketServer(server) {
             }
         }
 
-function calculateDirectorySize(directoryPath, currentDepth) {
-    if (currentDepth >= 500) {
-        log.warn(`Maximum depth reached at ${directoryPath}`);
-        return 0;
-    }
-
-    let totalSize = 0;
-    const files = fs.readdirSync(directoryPath);
-    for (const file of files) {
-        const filePath = path.join(directoryPath, file);
-        const stats = fs.statSync(filePath);
-        if (stats.isDirectory()) {
-            totalSize += calculateDirectorySize(filePath, currentDepth + 1);
-        } else {
-            totalSize += stats.size;
+        function calculateDirectorySize(directoryPath, currentDepth) {
+            if (currentDepth >= 500) {
+                log.warn(`Maximum depth reached at ${directoryPath}`);
+                return 0;
+            }
+        
+            let totalSize = 0;
+            const files = fs.readdirSync(directoryPath);
+            for (const file of files) {
+                const filePath = path.join(directoryPath, file);
+                const stats = fs.statSync(filePath);
+                if (stats.isDirectory()) {
+                    totalSize += calculateDirectorySize(filePath, currentDepth + 1);
+                } else {
+                    totalSize += stats.size;
+                }
+            }
+            return totalSize;
         }
-    }
-    return totalSize;
-}
 
-// fixed in 0.2.2 sam
-
+        // fixed in 0.2.2 sam
         function formatBytes(bytes) {
             if (bytes === 0) return '0 Bytes';
             const k = 1024;
