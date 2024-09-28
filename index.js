@@ -35,8 +35,8 @@ const ascii = fs.readFileSync('./handlers/ascii.txt', 'utf8');
 const { exec } = require('child_process');
 const { init, createVolumesFolder } = require('./handlers/init.js');
 const { seed } = require('./handlers/seed.js');
-const { start, createNewVolume } = require('./routes/InstanceFTP.js')
-const { createDatabaseAndUser } = require('./routes/InstanceDB.js');
+const { start, createNewVolume } = require('./routes/FTP.js')
+const { createDatabaseAndUser } = require('./routes/Database.js');
 const config = require('./config.json');
 
 const docker = new Docker({ socketPath: process.env.dockerSocket });

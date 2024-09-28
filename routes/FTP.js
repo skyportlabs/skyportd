@@ -64,7 +64,6 @@ const createNewVolume = async (dir) => {
 
     await fs.writeFile(userFile, JSON.stringify(userData, null, 2));
     users[username] = { password, root: userData.root };
-    log.info(`Created new user ${username} with password: ${password}`);
   }
 };
 
@@ -80,7 +79,6 @@ const watchVolumesDirectory = () => {
 const initializeUsers = async () => {
   await fs.mkdir(dataContainerDir, { recursive: true });
   const directories = await getDirectories(volumesDir);
-  console.log('Directories found:', directories);
 
   await Promise.all(directories.map(async (dir) => {
     const username = `user-${dir}`;
@@ -90,18 +88,13 @@ const initializeUsers = async () => {
     try {
       userData = JSON.parse(await fs.readFile(userFile, 'utf8'));
       users[username] = { password: userData.password, root: userData.root };
-      log.info(`User ${username} loaded with password: ${userData.password}`);
     } catch (err) {
-      console.error(`Error reading or parsing ${userFile}: ${err.message}`);
       const password = generatePassword(dir);
       userData = createUserData(username, password, dir);
       await fs.writeFile(userFile, JSON.stringify(userData, null, 2));
       users[username] = { password, root: userData.root };
-      log.info(`User ${username} created with password: ${password}`);
     }
   }));
-
-  log.info('All FTP users are initialized');
 };
 
 initializeUsers();
