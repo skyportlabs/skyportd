@@ -6,7 +6,7 @@
  *  /____/_/|_|\__, / .___/\____/_/   \__/\__,_/   
  *            /____/_/                        
  * 
- *  Skyport Daemon v0.2.2 (Firestorm)
+ *  Skyport Daemon v0.3.0 (Desiro City)
  *  (c) 2024 Matt James and contributers
  * 
 */
@@ -67,23 +67,6 @@ app.use(basicAuth({
     challenge: true
 }));
 
-const instanceRouter = require('./routes/Instance.js');
-const deploymentRouter = require('./routes/Deploy.js');
-const filesystemRouter = require('./routes/Volume.js');
-const archiveRouter = require('./routes/ArchiveVolume.js');
-const powerRouter = require('./routes/PowerActions.js');
-
-// use routes
-app.use('/instances', instanceRouter);
-app.use('/instances', deploymentRouter);
-app.use('/instances', powerRouter);
-
-// archive
-app.use('/archive', archiveRouter);
-
-// fs
-app.use('/fs', filesystemRouter);
-
 // FTP
 start();
 app.get('/ftp/info/:id', (req, res) => {
@@ -98,6 +81,7 @@ app.get('/ftp/info/:id', (req, res) => {
     });
 });
 
+// Databases
 app.post('/database/create/:name', async (req, res) => {
     try {
         const dbName = req.params.name;
@@ -111,6 +95,38 @@ app.post('/database/create/:name', async (req, res) => {
         res.status(500).json({ error: 'Failed to create database' });
     }
 });
+
+// Function to dynamically load routers
+function loadRouters() {
+    const routesDir = path.join(__dirname, 'routes');
+    fs.readdir(routesDir, (err, files) => {
+        if (err) {
+            log.error(`Error reading routes directory: ${err.message}`);
+            return;
+        }
+
+        files.forEach((file) => {
+            if (file.endsWith('.js')) {
+                try {
+                    const routerPath = path.join(routesDir, file);
+                    const router = require(routerPath);
+                    if (typeof router === 'function' && router.name === 'router') {
+                        const routeName = path.parse(file).name;
+                        app.use(`/`, router);
+                        log.info(`Loaded router: ${routeName}`);
+                    } else {
+                        log.warn(`File ${file} isn't a router. Not loading it`);
+                    }
+                } catch (error) {
+                    log.error(`Error loading router from ${file}: ${error.message}`);
+                }
+            }
+        });
+    });
+}
+
+// Call the function to load routers
+loadRouters();
 
 
 /**

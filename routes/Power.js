@@ -22,7 +22,7 @@ const docker = new Docker({ socketPath: process.env.dockerSocket });
  * @param {Object} res - The HTTP response object used to return success or error messages.
  * @returns {Response} JSON response indicating the outcome of the action, either successful execution or an error.
  */
-router.post('/:id/:power', async (req, res) => {
+router.post('/instances/:id/:power', async (req, res) => {
     const { power } = req.params;
     const container = docker.getContainer(req.params.id);
     try {

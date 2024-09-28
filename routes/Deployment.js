@@ -11,52 +11,68 @@ const { pipeline } = require('stream/promises');
 
 const docker = new Docker({ socketPath: process.env.dockerSocket });
 
-const downloadFile = (url, dir, filename) => {
-    return new Promise((resolve, reject) => {
-        const filePath = path.join(dir, filename);
-        https.get(url, async (response) => {
-            if (response.statusCode !== 200) {
-                reject(new Error(`Failed to download ${filename}: HTTP status code ${response.statusCode}`));
-                return;
-            }
-            const writeStream = fsSync.createWriteStream(filePath);
-            try {
-                await pipeline(response, writeStream);
-                resolve();
-            } catch (err) {
-                reject(err);
-            }
-        }).on('error', (err) => {
-            fsSync.unlink(filePath, () => {});
-            reject(err);
+/* utils */
+const statesFilePath = path.join(__dirname, './states.json');
+
+// Utility function to read states
+const readStates = async () => {
+    try {
+        const data = await fs.readFile(statesFilePath, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') {
+            return {};
+        }
+        throw error;
+    }
+};
+
+// Utility function to write states
+const writeStates = async (states) => {
+    await fs.writeFile(statesFilePath, JSON.stringify(states, null, 2));
+};
+
+// Utility function to update state
+const updateState = async (volumeId, state, containerId = null) => {
+    const states = await readStates();
+    states[volumeId] = { state, containerId };
+    await writeStates(states);
+};
+
+const downloadFile = async (url, dir, filename) => {
+    const filePath = path.join(dir, filename);
+    const writeStream = fsSync.createWriteStream(filePath);
+
+    try {
+        const response = await new Promise((resolve, reject) => {
+            https.get(url, resolve).on('error', reject);
         });
-    });
+
+        if (response.statusCode !== 200) {
+            throw new Error(`Failed to download ${filename}: HTTP status code ${response.statusCode}`);
+        }
+
+        await pipeline(response, writeStream);
+    } catch (err) {
+        await fs.unlink(filePath).catch(() => {});
+        throw err;
+    }
 };
 
 const downloadInstallScripts = async (installScripts, dir, variables) => {
-    try {
-        const parsedVariables = typeof variables === 'string' ? JSON.parse(variables) : variables;
+    const parsedVariables = typeof variables === 'string' ? JSON.parse(variables) : variables;
 
-        for (const script of installScripts) {
-            try {
-                let updatedUri = script.Uri;
-
-                if (parsedVariables) {
-                    for (const [key, value] of Object.entries(parsedVariables)) {
-                        updatedUri = updatedUri.replace(new RegExp(`{{${key}}}`, 'g'), value);
-                        log.info(`Replaced ${key} with ${value} in ${updatedUri}`);
-                    }
-                }
-
-                await downloadFile(updatedUri, dir, script.Path);
-                log.info(`Successfully downloaded ${script.Path}`);
-            } catch (err) {
-                log.error(`Failed to download ${script.Path}: ${err.message}`);
+    for (const script of installScripts) {
+        try {
+            let updatedUri = script.Uri;
+            for (const [key, value] of Object.entries(parsedVariables)) {
+                updatedUri = updatedUri.replace(new RegExp(`{{${key}}}`, 'g'), value);
             }
+            await downloadFile(updatedUri, dir, script.Path);
+            log.info(`Successfully downloaded ${script.Path}`);
+        } catch (err) {
+            log.error(`Failed to download ${script.Path}: ${err.message}`);
         }
-    } catch (err) {
-        log.error(`Error in downloadInstallScripts: ${err.message}`);
-        throw err;
     }
 };
 
@@ -77,75 +93,95 @@ const replaceVariables = async (dir, variables) => {
     }
 };
 
-router.post('/create', async (req, res) => {
+const objectToEnv = (obj) => Object.entries(obj).map(([key, value]) => `${key}=${value}`);
+
+const createContainerOptions = (config, volumePath) => ({
+    name: config.Id,
+    Image: config.Image,
+    ExposedPorts: config.Ports,
+    AttachStdout: true,
+    AttachStderr: true,
+    AttachStdin: true,
+    Tty: true,
+    OpenStdin: true,
+    HostConfig: {
+        PortBindings: config.PortBindings,
+        Binds: [`${volumePath}:/app/data`],
+        Memory: config.Memory * 1024 * 1024,
+        CpuCount: config.Cpu,
+        NetworkMode: 'host'
+    },
+    Env: config.Env,
+    ...(config.Cmd && { Cmd: config.Cmd })
+});
+
+// Route handlers
+const createContainer = async (req, res) => {
     log.info('Deployment in progress...');
     const { Image, Id, Cmd, Env, Ports, Scripts, Memory, Cpu, PortBindings } = req.body;
-    const variables2 = req.body.variables;
+    const variables = req.body.variables;
 
     try {
         const volumePath = path.join(__dirname, '../volumes', Id);
         await fs.mkdir(volumePath, { recursive: true });
         const primaryPort = Object.values(PortBindings)[0][0].HostPort;
 
-        function objectToEnv(obj) {
-            return Object.entries(obj).map(([key, value]) => `${key}=${value}`);
-        }
-        const variables2Env = objectToEnv(JSON.parse(variables2));
-
+        const variablesEnv = objectToEnv(JSON.parse(variables));
         const environmentVariables = [
             ...(Env || []),
-            ...variables2Env,
+            ...variablesEnv,
             `PRIMARY_PORT=${primaryPort}`
         ];
 
-        const containerOptions = {
-            name: Id,
-            Image,
-            ExposedPorts: Ports,
-            AttachStdout: true,
-            AttachStderr: true,
-            AttachStdin: true,
-            Tty: true,
-            OpenStdin: true,
-            HostConfig: {
-                PortBindings: PortBindings,
-                Binds: [`${volumePath}:/app/data`],
-                Memory: Memory * 1024 * 1024,
-                CpuCount: Cpu,
-                NetworkMode: 'host'
-            },
-            Env: environmentVariables
-        };
+        // Update state to INSTALLING
+        await updateState(Id, 'INSTALLING');
 
-        if (Cmd) containerOptions.Cmd = Cmd;
+        // Respond immediately with volumeId
+        res.status(202).json({ 
+            message: 'Deployment started', 
+            volumeId: Id
+        });
+
+        // Pull the image
+        log.info(`Pulling image: ${Image}`);
+        await docker.pull(Image);
+        log.info(`Image pulled successfully: ${Image}`);
+
+        const containerOptions = createContainerOptions({
+            Image, Id, Cmd, Ports, Memory, Cpu, PortBindings,
+            Env: environmentVariables
+        }, volumePath);
 
         const container = await docker.createContainer(containerOptions);
-
-        log.info('Deployment completed! Container: ' + container.id);
-        res.status(201).json({ message: 'Container and volume created successfully', containerId: container.id, volumeId: Id, Env: environmentVariables });
-
+        log.info('Container created: ' + container.id);
+        
         if (Scripts && Scripts.Install && Array.isArray(Scripts.Install)) {
             const dir = path.join(__dirname, '../volumes', Id);
-            await downloadInstallScripts(Scripts.Install, dir, variables2);
+            await downloadInstallScripts(Scripts.Install, dir, variables);
 
-            const variables = {
+            const replaceVars = {
                 primaryPort: primaryPort,
                 containerName: container.id.substring(0, 12),
                 timestamp: new Date().toISOString(),
                 randomString: Math.random().toString(36).substring(7)
             };
 
-            await replaceVariables(dir, variables);
+            await replaceVariables(dir, replaceVars);
         }
 
         await container.start();
+
+        // Update state to READY
+        await updateState(Id, 'READY', container.id);
+
+        log.info('Deployment completed successfully');
     } catch (err) {
         log.error('Deployment failed: ' + err.message);
-        res.status(500).json({ message: err.message });
+        await updateState(Id, 'FAILED');
     }
-});
+};
 
-router.delete('/:id', async (req, res) => {
+const deleteContainer = async (req, res) => {
     const container = docker.getContainer(req.params.id);
     try {
         await container.remove();
@@ -153,9 +189,9 @@ router.delete('/:id', async (req, res) => {
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
-});
+};
 
-router.post('/redeploy/:id', async (req, res) => {
+const redeployContainer = async (req, res) => {
     const { id } = req.params;
     const container = docker.getContainer(id);
     try {
@@ -164,23 +200,9 @@ router.post('/redeploy/:id', async (req, res) => {
         const { Image, Id, Ports, Memory, Cpu, PortBindings, Env } = req.body;
         const volumePath = path.join(__dirname, '../volumes', Id);
 
-        const containerOptions = {
-            Image,
-            ExposedPorts: Ports,
-            AttachStdout: true,
-            AttachStderr: true,
-            AttachStdin: true,
-            Tty: true,
-            OpenStdin: true,
-            HostConfig: {
-                PortBindings: PortBindings,
-                Binds: [`${volumePath}:/app/data`],
-                Memory: Memory * 1024 * 1024,
-                CpuCount: Cpu,
-                NetworkMode: 'host'
-            },
-            Env: Env
-        };
+        const containerOptions = createContainerOptions({
+            Image, Id, Ports, Memory, Cpu, PortBindings, Env
+        }, volumePath);
 
         const newContainer = await docker.createContainer(containerOptions);
         await newContainer.start();
@@ -188,9 +210,9 @@ router.post('/redeploy/:id', async (req, res) => {
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
-});
+};
 
-router.post('/reinstall/:id', async (req, res) => {
+const reinstallContainer = async (req, res) => {
     const { id } = req.params;
     const container = docker.getContainer(id);
     
@@ -203,38 +225,20 @@ router.post('/reinstall/:id', async (req, res) => {
         console.log(`Removing container ${id}`);
         await container.remove();
 
-        function env2json(env) {
-            console.log('env2json', env);
-            return env.reduce((obj, item) => {
-                const [key, value] = item.split('=');
-                obj[key] = value;
-                return obj;
-            }, {});
-        }
+        const env2json = (env) => env.reduce((obj, item) => {
+            const [key, value] = item.split('=');
+            obj[key] = value;
+            return obj;
+        }, {});
 
         const { Image, Id, Ports, Memory, Cpu, PortBindings, Env, imageData } = req.body;
         const volumePath = path.join(__dirname, '../volumes', Id);
 
-        const containerOptions = {
-            Image,
-            ExposedPorts: Ports,
-            AttachStdout: true,
-            AttachStderr: true,
-            AttachStdin: true,
-            Tty: true,
-            OpenStdin: true,
-            HostConfig: {
-                PortBindings: PortBindings,
-                Binds: [`${volumePath}:/app/data`],
-                Memory: Memory * 1024 * 1024,
-                CpuCount: Cpu,
-                NetworkMode: 'host'
-            },
-            Env: Env
-        };
+        const containerOptions = createContainerOptions({
+            Image, Id, Ports, Memory, Cpu, PortBindings, Env
+        }, volumePath);
 
         const newContainer = await docker.createContainer(containerOptions);
-
 
         if (imageData && imageData.Scripts && imageData.Scripts.Install && Array.isArray(imageData.Scripts.Install)) {
             const dir = path.join(__dirname, '../volumes', Id);
@@ -247,7 +251,6 @@ router.post('/reinstall/:id', async (req, res) => {
                 timestamp: new Date().toISOString(),
                 randomString: Math.random().toString(36).substring(7)
             };
-            const envVariables = Object.fromEntries(Env.map(e => e.split('=')));
             await replaceVariables(dir, variables);
         }
         await newContainer.start();
@@ -256,10 +259,9 @@ router.post('/reinstall/:id', async (req, res) => {
         console.error('Error reinstalling instance:', err);
         res.status(500).json({ message: err.message });
     }
-});
+};
 
-
-router.put('/edit/:id', async (req, res) => {
+const editContainer = async (req, res) => {
     const { id } = req.params;
     const { Image, Memory, Cpu, VolumeId } = req.body;
 
@@ -269,24 +271,18 @@ router.put('/edit/:id', async (req, res) => {
         const containerInfo = await container.inspect();
         const existingConfig = containerInfo.Config;
         const existingHostConfig = containerInfo.HostConfig;
-        const newContainerOptions = {
+
+        const newContainerOptions = createContainerOptions({
             Image: Image || existingConfig.Image,
-            ExposedPorts: existingConfig.ExposedPorts,
-            Cmd: existingConfig.Cmd,
+            Id: id,
+            Ports: existingConfig.ExposedPorts,
+            Memory: Memory || existingHostConfig.Memory / (1024 * 1024),
+            Cpu: Cpu || existingHostConfig.CpuCount,
+            PortBindings: existingHostConfig.PortBindings,
             Env: existingConfig.Env,
-            AttachStdout: true,
-            AttachStderr: true,
-            AttachStdin: true,
-            Tty: true,
-            OpenStdin: true,
-            HostConfig: {
-                PortBindings: existingHostConfig.PortBindings,
-                Binds: [`${path.join(__dirname, '../volumes', VolumeId)}:/app/data`],
-                Memory: Memory ? Memory * 1024 * 1024 : existingHostConfig.Memory,
-                CpuCount: Cpu || existingHostConfig.CpuCount,
-                NetworkMode: 'host'
-            }
-        };
+            Cmd: existingConfig.Cmd
+        }, path.join(__dirname, '../volumes', VolumeId));
+
         log.info(`Stopping container: ${id}`);
         await container.stop();
         log.info(`Removing container: ${id}`);
@@ -301,11 +297,30 @@ router.put('/edit/:id', async (req, res) => {
             oldContainerId: id, 
             newContainerId: newContainer.id 
         });
-
     } catch (err) {
         log.error(`Edit failed: ${err.message}`);
         res.status(500).json({ message: err.message });
     }
-});
+};
+
+const getContainerState = async (req, res) => {
+    const { volumeId } = req.params;
+    try {
+        const states = await readStates();
+        const containerState = states[volumeId] || { state: 'UNKNOWN' };
+        console.log(JSON.stringify(containerState))
+        res.status(200).json(containerState);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
+
+// Routes
+router.post('/instances/create', createContainer);
+router.delete('/instances/:id', deleteContainer);
+router.post('/instances/redeploy/:id', redeployContainer);
+router.post('/instances/reinstall/:id', reinstallContainer);
+router.put('/instances/edit/:id', editContainer);
+router.get('/state/:volumeId', getContainerState);
 
 module.exports = router;

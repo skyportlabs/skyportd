@@ -44,7 +44,7 @@ function formatFileSize(bytes) {
  * GET /:id/archives
  * Lists all archives for the specified volume, including their timestamp, size, and name.
  */
-router.get('/:id/archives', async (req, res) => {
+router.get('/archive/:id/archives', async (req, res) => {
     const { id } = req.params;
     const archivePath = path.join(__dirname, '../archives', id);
 
@@ -78,7 +78,7 @@ router.get('/:id/archives', async (req, res) => {
  * POST /:id/archives/:volumeId/create
  * Creates an archive of the specified volume and stores it in the archives directory.
  */
-router.post('/:id/archives/:volumeId/create', async (req, res) => {
+router.post('/archive/:id/archives/:volumeId/create', async (req, res) => {
     const { id, volumeId } = req.params;
     const volumePath = path.join(__dirname, '../volumes', volumeId);
     const archivePath = path.join(__dirname, '../archives', id);
@@ -119,7 +119,7 @@ router.post('/:id/archives/:volumeId/create', async (req, res) => {
  * GET /:id/archives/download/:archiveName
  * Allows downloading of the specified archive file.
  */
-router.get('/:id/archives/download/:archiveName', async (req, res) => {
+router.get('/archive/:id/archives/download/:archiveName', async (req, res) => {
     const { id, archiveName } = req.params;
     const archivePath = path.join(__dirname, '../archives', id, archiveName);
 
@@ -146,7 +146,7 @@ router.get('/:id/archives/download/:archiveName', async (req, res) => {
  * POST /:id/archives/delete/:archiveName
  * Deletes the specified archive.
  */
-router.post('/:id/archives/delete/:archiveName', async (req, res) => {
+router.post('/archive/:id/archives/delete/:archiveName', async (req, res) => {
     const { id, archiveName } = req.params;
     const archivePath = path.join(__dirname, '../archives', id, archiveName);
 
@@ -166,7 +166,7 @@ router.post('/:id/archives/delete/:archiveName', async (req, res) => {
  * POST /:id/archives/rollback/:volumeId/:archiveName
  * Rolls back the specified volume to the state of the given archive.
  */
-router.post('/:id/archives/rollback/:volumeId/:archiveName', async (req, res) => {
+router.post('/archive/:id/archives/rollback/:volumeId/:archiveName', async (req, res) => {
     const { id, archiveName, volumeId } = req.params;
     const volumePath = path.join(__dirname, '../volumes', volumeId);
     const archivePath = path.join(__dirname, '../archives', id, archiveName);
