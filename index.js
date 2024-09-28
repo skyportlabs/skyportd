@@ -253,10 +253,7 @@ function initializeWebSocketServer(server) {
             ws.on('message', (msg) => {
                 if (isAuthenticated) {
                     const command = JSON.parse(msg).command;
-                    
-                    if (command === "skyportCredits") {
-                        ws.send("privt00, am5z, achul123, thatdevwolfy");
-                    } else if (command) {
+                    if (command) {
                         executeCommand(ws, container, command);
                     }
                 }
