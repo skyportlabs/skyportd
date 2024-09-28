@@ -139,6 +139,7 @@ const createContainer = async (req, res) => {
         // Respond immediately with volumeId
         res.status(202).json({ 
             message: 'Deployment started', 
+            Env: environmentVariables,
             volumeId: Id
         });
 
