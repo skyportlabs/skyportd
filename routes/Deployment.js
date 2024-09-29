@@ -200,10 +200,31 @@ const redeployContainer = async (req, res) => {
     const { id } = req.params;
     const container = docker.getContainer(id);
     try {
+        const containerInfo = await container.inspect();
+        if (containerInfo.State.Running) {
+            console.log(`Stopping container ${id}`);
+            await container.stop();
+        }
+        console.log(`Removing container ${id}`);
         await container.remove();
 
         const { Image, Id, Ports, Memory, Cpu, PortBindings, Env } = req.body;
         const volumePath = path.join(__dirname, '../volumes', Id);
+        try {
+            const stream = await docker.pull(Image);
+            await new Promise((resolve, reject) => {
+                docker.modem.followProgress(stream, (err, result) => {
+                    if (err) {
+                        return reject(new Error(`Failed to pull image: ${err.message}`));
+                    }
+                    console.log(`Image ${Image} pulled successfully.`);
+                    resolve(result);
+                });
+            });
+        } catch (err) {
+            console.error(`Error pulling image ${Image}:`, err);
+            return res.status(500).json({ message: err.message });
+        }
 
         const containerOptions = createContainerOptions({
             Image, Id, Ports, Memory, Cpu, PortBindings, Env
@@ -212,15 +233,18 @@ const redeployContainer = async (req, res) => {
         const newContainer = await docker.createContainer(containerOptions);
         await newContainer.start();
         res.status(200).json({ message: 'Container redeployed successfully', containerId: newContainer.id });
+        await updateState(Id, 'READY', container.id);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
 };
 
+
+
 const reinstallContainer = async (req, res) => {
     const { id } = req.params;
     const container = docker.getContainer(id);
-    
+
     try {
         const containerInfo = await container.inspect();
         if (containerInfo.State.Running) {
@@ -239,12 +263,27 @@ const reinstallContainer = async (req, res) => {
         const { Image, Id, Ports, Memory, Cpu, PortBindings, Env, imageData } = req.body;
         const volumePath = path.join(__dirname, '../volumes', Id);
 
+        try {
+            const stream = await docker.pull(Image);
+            await new Promise((resolve, reject) => {
+                docker.modem.followProgress(stream, (err, result) => {
+                    if (err) {
+                        return reject(new Error(`Failed to pull image: ${err.message}`));
+                    }
+                    console.log(`Image ${Image} pulled successfully.`);
+                    resolve(result);
+                });
+            });
+        } catch (err) {
+            console.error(`Error pulling image ${Image}:`, err);
+            return res.status(500).json({ message: err.message });
+        }
+
         const containerOptions = createContainerOptions({
             Image, Id, Ports, Memory, Cpu, PortBindings, Env
         }, volumePath);
 
         const newContainer = await docker.createContainer(containerOptions);
-
         if (imageData && imageData.Scripts && imageData.Scripts.Install && Array.isArray(imageData.Scripts.Install)) {
             const dir = path.join(__dirname, '../volumes', Id);
 
@@ -258,6 +297,7 @@ const reinstallContainer = async (req, res) => {
             };
             await replaceVariables(dir, variables);
         }
+
         await newContainer.start();
         res.status(200).json({ message: 'Container reinstalled successfully', containerId: newContainer.id });
     } catch (err) {
@@ -265,6 +305,8 @@ const reinstallContainer = async (req, res) => {
         res.status(500).json({ message: err.message });
     }
 };
+
+
 
 const editContainer = async (req, res) => {
     const { id } = req.params;
