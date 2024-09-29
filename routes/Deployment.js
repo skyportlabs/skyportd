@@ -121,8 +121,6 @@ const createContainer = async (req, res) => {
     const { Image, Id, Cmd, Env, Ports, Scripts, Memory, Cpu, PortBindings } = req.body;
     const variables = req.body.variables || {};
 
-    console.log(1);
-
     try {
         const volumePath = path.join(__dirname, '../volumes', Id);
         await fs.mkdir(volumePath, { recursive: true });
