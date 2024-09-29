@@ -119,14 +119,19 @@ const createContainerOptions = (config, volumePath) => ({
 const createContainer = async (req, res) => {
     log.info('Deployment in progress...');
     const { Image, Id, Cmd, Env, Ports, Scripts, Memory, Cpu, PortBindings } = req.body;
-    const variables = req.body.variables;
+    const variables = req.body.variables || {};
+
+    console.log(1);
 
     try {
         const volumePath = path.join(__dirname, '../volumes', Id);
         await fs.mkdir(volumePath, { recursive: true });
         const primaryPort = Object.values(PortBindings)[0][0].HostPort;
 
-        const variablesEnv = objectToEnv(JSON.parse(variables));
+        const variablesEnv = variables && Object.keys(variables).length > 0
+            ? objectToEnv(JSON.parse(variables))
+            : [];
+
         const environmentVariables = [
             ...(Env || []),
             ...variablesEnv,
@@ -158,7 +163,7 @@ const createContainer = async (req, res) => {
         
         if (Scripts && Scripts.Install && Array.isArray(Scripts.Install)) {
             const dir = path.join(__dirname, '../volumes', Id);
-            await downloadInstallScripts(Scripts.Install, dir, variables);
+            await downloadInstallScripts(Scripts.Install, dir, variables || {});
 
             const replaceVars = {
                 primaryPort: primaryPort,
@@ -181,6 +186,7 @@ const createContainer = async (req, res) => {
         await updateState(Id, 'FAILED');
     }
 };
+
 
 const deleteContainer = async (req, res) => {
     const container = docker.getContainer(req.params.id);
