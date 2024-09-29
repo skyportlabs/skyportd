@@ -200,6 +200,8 @@ const redeployContainer = async (req, res) => {
     const { id } = req.params;
     const container = docker.getContainer(id);
     try {
+        const { Idd } = req.params;
+        await updateState(Idd, 'INSTALLING');
         const containerInfo = await container.inspect();
         if (containerInfo.State.Running) {
             console.log(`Stopping container ${id}`);
@@ -233,7 +235,7 @@ const redeployContainer = async (req, res) => {
         const newContainer = await docker.createContainer(containerOptions);
         await newContainer.start();
         res.status(200).json({ message: 'Container redeployed successfully', containerId: newContainer.id });
-        await updateState(Id, 'READY', container.id);
+        await updateState(Idd, 'READY', newContainer.id);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
@@ -246,6 +248,8 @@ const reinstallContainer = async (req, res) => {
     const container = docker.getContainer(id);
 
     try {
+        const { Idd } = req.params;
+        await updateState(Idd, 'INSTALLING');
         const containerInfo = await container.inspect();
         if (containerInfo.State.Running) {
             console.log(`Stopping container ${id}`);
@@ -300,6 +304,7 @@ const reinstallContainer = async (req, res) => {
 
         await newContainer.start();
         res.status(200).json({ message: 'Container reinstalled successfully', containerId: newContainer.id });
+        await updateState(Idd, 'READY', newContainer.id);
     } catch (err) {
         console.error('Error reinstalling instance:', err);
         res.status(500).json({ message: err.message });
@@ -365,8 +370,8 @@ const getContainerState = async (req, res) => {
 // Routes
 router.post('/instances/create', createContainer);
 router.delete('/instances/:id', deleteContainer);
-router.post('/instances/redeploy/:id', redeployContainer);
-router.post('/instances/reinstall/:id', reinstallContainer);
+router.post('/instances/redeploy/:id/:Idd', redeployContainer);
+router.post('/instances/reinstall/:id/:Idd', reinstallContainer);
 router.put('/instances/edit/:id', editContainer);
 router.get('/state/:volumeId', getContainerState);
 
