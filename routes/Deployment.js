@@ -12,7 +12,7 @@ const { pipeline } = require('stream/promises');
 const docker = new Docker({ socketPath: process.env.dockerSocket });
 
 /* utils */
-const statesFilePath = path.join(__dirname, './states.json');
+const statesFilePath = path.join(__dirname, '../storage/states.json');
 
 // Utility function to read states
 const readStates = async () => {
@@ -49,7 +49,7 @@ const downloadFile = async (url, dir, filename) => {
         });
 
         if (response.statusCode !== 200) {
-            throw new Error(`Failed to download ${filename}: HTTP status code ${response.statusCode}`);
+            throw new Error(`Failed to download ${filename}: HTTP status code ${response.statusCode} on the URL ${url}`);
         }
 
         await pipeline(response, writeStream);
@@ -115,11 +115,20 @@ const createContainerOptions = (config, volumePath) => ({
     ...(config.Cmd && { Cmd: config.Cmd })
 });
 
-// Route handlers
 const createContainer = async (req, res) => {
     log.info('Deployment in progress...');
-    const { Image, Id, Cmd, Env, Ports, Scripts, Memory, Cpu, PortBindings } = req.body;
-    const variables = req.body.variables || {};
+    let { Image, Id, Cmd, Env, Ports, Scripts, Memory, Cpu, PortBindings } = req.body;
+    let variables = req.body.variables || {};
+
+    if (typeof variables !== 'string') {
+        variables = JSON.stringify(variables);
+    } else {
+        try {
+            JSON.parse(variables);
+        } catch (e) {
+            variables = JSON.stringify(variables);
+        }
+    }
 
     try {
         const volumePath = path.join(__dirname, '../volumes', Id);
@@ -135,7 +144,7 @@ const createContainer = async (req, res) => {
             ...variablesEnv,
             `PRIMARY_PORT=${primaryPort}`
         ];
-
+        
         // Update state to INSTALLING
         await updateState(Id, 'INSTALLING');
 

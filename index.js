@@ -38,6 +38,7 @@ const { seed } = require('./handlers/seed.js');
 const { start, createNewVolume } = require('./routes/FTP.js')
 const { createDatabaseAndUser } = require('./routes/Database.js');
 const config = require('./config.json');
+const statslogger = require('./routes/Stats.js');
 
 const docker = new Docker({ socketPath: process.env.dockerSocket });
 
@@ -66,6 +67,58 @@ app.use(basicAuth({
     users: { 'Skyport': config.key },
     challenge: true
 }));
+
+
+// Node Sats
+statslogger.initLogger();
+
+function startLoggingStats() {
+    setInterval(() => {
+        const stats = statslogger.getSystemStats();
+        statslogger.saveStats(stats);
+    }, 100000);
+}
+
+startLoggingStats();
+
+
+app.get('/stats', async (req, res) => {
+    try {
+        const totalStats = statslogger.getSystemStats.total();
+        const containers = await docker.listContainers({ all: true });
+        const onlineContainersCount = containers.filter(container => container.State === 'running').length;
+        const uptimeInSeconds = process.uptime();
+
+        const formatUptime = (uptime) => {
+            const seconds = uptime % 60;
+            const minutes = Math.floor((uptime / 60) % 60);
+            const hours = Math.floor((uptime / 3600) % 24);
+            const days = Math.floor(uptime / 86400);
+            const parts = [];
+
+            if (days > 0) parts.push(`${days}d`);
+            if (hours > 0) parts.push(`${hours}h`);
+            if (minutes > 0) parts.push(`${minutes}m`);
+            if (parts.length === 0) return '0m';
+
+            return parts.join(' ');
+        };
+
+        const responseStats = {
+            totalStats,
+            onlineContainersCount,
+            uptime: formatUptime(uptimeInSeconds)
+        };
+
+        res.json(responseStats);
+    } catch (error) {
+        console.error('Error fetching stats:', error);
+        res.status(500).json({ error: 'Failed to fetch stats' });
+    }
+});
+
+
+
 
 // FTP
 start();
