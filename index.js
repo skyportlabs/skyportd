@@ -72,15 +72,18 @@ app.use(basicAuth({
 // Node Sats
 statslogger.initLogger();
 
-function startLoggingStats() {
-    setInterval(() => {
-        const stats = statslogger.getSystemStats();
-        statslogger.saveStats(stats);
-    }, 100000);
+async function startLoggingStats() {
+    setInterval(async () => {
+        try {
+            const stats = await statslogger.getSystemStats();
+            statslogger.saveStats(stats);
+        } catch (error) {
+            console.error('Error logging stats:', error);
+        }
+    }, 10000);
 }
 
 startLoggingStats();
-
 
 app.get('/stats', async (req, res) => {
     try {
@@ -90,7 +93,6 @@ app.get('/stats', async (req, res) => {
         const uptimeInSeconds = process.uptime();
 
         const formatUptime = (uptime) => {
-            const seconds = uptime % 60;
             const minutes = Math.floor((uptime / 60) % 60);
             const hours = Math.floor((uptime / 3600) % 24);
             const days = Math.floor(uptime / 86400);
