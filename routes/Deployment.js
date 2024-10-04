@@ -66,7 +66,9 @@ const downloadInstallScripts = async (installScripts, dir, variables) => {
         try {
             let updatedUri = script.Uri;
             for (const [key, value] of Object.entries(parsedVariables)) {
-                updatedUri = updatedUri.replace(new RegExp(`{{${key}}}`, 'g'), value);
+                const regex = new RegExp(`{{${key}}}`, 'g');
+                updatedUri = updatedUri.replace(regex, value);
+                log.info(updatedUri);
             }
             await downloadFile(updatedUri, dir, script.Path);
             log.info(`Successfully downloaded ${script.Path}`);
