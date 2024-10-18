@@ -42,20 +42,39 @@ const updateState = async (volumeId, state, containerId = null) => {
 const downloadFile = async (url, dir, filename) => {
     const filePath = path.join(dir, filename);
     const writeStream = fsSync.createWriteStream(filePath);
+    
+    const maxAttempts = 3;
+    let attempt = 0;
 
-    try {
-        const response = await new Promise((resolve, reject) => {
-            https.get(url, resolve).on('error', reject);
-        });
+    while (attempt < maxAttempts) {
+        try {
+            attempt++;
+            const response = await new Promise((resolve, reject) => {
+                https.get(url, (res) => {
+                    resolve(res);
+                }).on('error', reject);
+            });
 
-        if (response.statusCode !== 200) {
-            throw new Error(`Failed to download ${filename}: HTTP status code ${response.statusCode} on the URL ${url}`);
+            if (response.statusCode === 522) {
+                log.info(`Received status code 522. Waiting for 60 seconds before retrying...`);
+                await new Promise(resolve => setTimeout(resolve, 60000));
+                continue;
+            }
+
+            if (response.statusCode !== 200) {
+                throw new Error(`Failed to download ${filename}: HTTP status code ${response.statusCode} on the URL ${url}`);
+            }
+
+            await pipeline(response, writeStream);
+            log.info(`Downloaded ${filename} successfully.`);
+            break;
+        } catch (err) {
+            log.error(`Attempt ${attempt} failed: ${err.message}`);
+            await fsSync.promises.unlink(filePath).catch(() => {});
+            if (attempt === maxAttempts) {
+                throw new Error(`Failed to download ${filename} after ${maxAttempts} attempts.`);
+            }
         }
-
-        await pipeline(response, writeStream);
-    } catch (err) {
-        await fs.unlink(filePath).catch(() => {});
-        throw err;
     }
 };
 
