@@ -227,7 +227,6 @@ const createContainer = async (req, res) => {
     }
 };
 
-
 const deleteContainer = async (req, res) => {
     const container = docker.getContainer(req.params.id);
     try {
@@ -350,8 +349,6 @@ const reinstallContainer = async (req, res) => {
         res.status(500).json({ message: err.message });
     }
 };
-
-
 
 const editContainer = async (req, res) => {
     const { id } = req.params;
