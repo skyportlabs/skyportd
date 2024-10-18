@@ -150,17 +150,29 @@ const createContainer = async (req, res) => {
         // Update state to INSTALLING
         await updateState(Id, 'INSTALLING');
 
+        log.info(`Pulling image: ${Image}`);
+        try {
+            const stream = await docker.pull(Image);
+            await new Promise((resolve, reject) => {
+                docker.modem.followProgress(stream, (err, result) => {
+                    if (err) {
+                        return reject(new Error(`Failed to pull image: ${err.message}`));
+                    }
+                    log.info(`Image ${Image} pulled successfully.`);
+                    resolve(result);
+                });
+            });
+        } catch (err) {
+            log.error(`Error pulling image ${Image}:`, err);
+            return res.status(500).json({ message: err.message });
+        }
+
         // Respond immediately with volumeId
         res.status(202).json({ 
             message: 'Deployment started', 
             Env: environmentVariables,
             volumeId: Id
         });
-
-        // Pull the image
-        log.info(`Pulling image: ${Image}`);
-        await docker.pull(Image);
-        log.info(`Image pulled successfully: ${Image}`);
 
         const containerOptions = createContainerOptions({
             Image, Id, Cmd, Ports, Memory, Cpu, PortBindings,
@@ -215,10 +227,10 @@ const redeployContainer = async (req, res) => {
         await updateState(Idd, 'INSTALLING');
         const containerInfo = await container.inspect();
         if (containerInfo.State.Running) {
-            console.log(`Stopping container ${id}`);
+            log.info(`Stopping container ${id}`);
             await container.stop();
         }
-        console.log(`Removing container ${id}`);
+        log.info(`Removing container ${id}`);
         await container.remove();
 
         const { Image, Id, Ports, Memory, Cpu, PortBindings, Env } = req.body;
@@ -230,12 +242,12 @@ const redeployContainer = async (req, res) => {
                     if (err) {
                         return reject(new Error(`Failed to pull image: ${err.message}`));
                     }
-                    console.log(`Image ${Image} pulled successfully.`);
+                    log.info(`Image ${Image} pulled successfully.`);
                     resolve(result);
                 });
             });
         } catch (err) {
-            console.error(`Error pulling image ${Image}:`, err);
+            log.error(`Error pulling image ${Image}:`, err);
             return res.status(500).json({ message: err.message });
         }
 
@@ -252,8 +264,6 @@ const redeployContainer = async (req, res) => {
     }
 };
 
-
-
 const reinstallContainer = async (req, res) => {
     const { id } = req.params;
     const container = docker.getContainer(id);
@@ -263,10 +273,10 @@ const reinstallContainer = async (req, res) => {
         await updateState(Idd, 'INSTALLING');
         const containerInfo = await container.inspect();
         if (containerInfo.State.Running) {
-            console.log(`Stopping container ${id}`);
+            log.info(`Stopping container ${id}`);
             await container.stop();
         }
-        console.log(`Removing container ${id}`);
+        log.info(`Removing container ${id}`);
         await container.remove();
 
         const env2json = (env) => env.reduce((obj, item) => {
@@ -285,12 +295,12 @@ const reinstallContainer = async (req, res) => {
                     if (err) {
                         return reject(new Error(`Failed to pull image: ${err.message}`));
                     }
-                    console.log(`Image ${Image} pulled successfully.`);
+                    log.info(`Image ${Image} pulled successfully.`);
                     resolve(result);
                 });
             });
         } catch (err) {
-            console.error(`Error pulling image ${Image}:`, err);
+            log.error(`Error pulling image ${Image}:`, err);
             return res.status(500).json({ message: err.message });
         }
 
@@ -317,7 +327,7 @@ const reinstallContainer = async (req, res) => {
         res.status(200).json({ message: 'Container reinstalled successfully', containerId: newContainer.id });
         await updateState(Idd, 'READY', newContainer.id);
     } catch (err) {
-        console.error('Error reinstalling instance:', err);
+        log.error('Error reinstalling instance:', err);
         res.status(500).json({ message: err.message });
     }
 };
@@ -371,7 +381,7 @@ const getContainerState = async (req, res) => {
     try {
         const states = await readStates();
         const containerState = states[volumeId] || { state: 'UNKNOWN' };
-        console.log(JSON.stringify(containerState))
+        log.info(JSON.stringify(containerState))
         res.status(200).json(containerState);
     } catch (err) {
         res.status(500).json({ message: err.message });

@@ -6,6 +6,7 @@ const log = new CatLoggr();
 const osut = require('os-utils');
 
 const storagePath = path.join(__dirname, '../storage/systemStats.json');
+const tempStoragePath = path.join(__dirname, '../storage/systemStats.tmp.json');
 const maxAge = 5 * 60 * 10000;
 let statsLog = [];
 
@@ -55,9 +56,18 @@ function saveStats(stats) {
     if (stats && stats.timestamp) {
         statsLog.push(stats);
         cleanOldEntries();
-        fs.writeFile(storagePath, JSON.stringify(statsLog, null, 2), (err) => {
+
+        // Write to temp file first
+        fs.writeFile(tempStoragePath, JSON.stringify(statsLog, null, 2), (err) => {
             if (err) {
-                log.error('Error saving stats to JSON file:', err);
+                log.error('Error saving stats to temp JSON file:', err);
+            } else {
+                // Once temp file is written, rename to actual file
+                fs.rename(tempStoragePath, storagePath, (err) => {
+                    if (err) {
+                        log.error('Error renaming temp file to JSON file:', err);
+                    }
+                });
             }
         });
     }
@@ -68,17 +78,23 @@ function initLogger() {
     if (fs.existsSync(storagePath)) {
         try {
             const data = fs.readFileSync(storagePath, 'utf8');
-            const parsedData = JSON.parse(data);
-            if (Array.isArray(parsedData)) {
-                statsLog = parsedData.filter(entry => entry && entry.timestamp);
-                cleanOldEntries();
-                fs.writeFile(storagePath, JSON.stringify(statsLog, null, 2), (err) => {
-                    if (err) {
-                        log.error('Error saving stats to JSON file:', err);
-                    }
-                });
+            
+            if (data.trim()) { // Ensure the file is not empty
+                const parsedData = JSON.parse(data);
+                if (Array.isArray(parsedData)) {
+                    statsLog = parsedData.filter(entry => entry && entry.timestamp);
+                    cleanOldEntries();
+                    fs.writeFile(storagePath, JSON.stringify(statsLog, null, 2), (err) => {
+                        if (err) {
+                            log.error('Error saving stats to JSON file:', err);
+                        }
+                    });
+                } else {
+                    log.error('Error parsing JSON data: Expected array but got:', parsedData);
+                    statsLog = [];
+                }
             } else {
-                log.error('Error parsing JSON data:', parsedData);
+                log.warn('Stats file is empty, initializing with empty statsLog.');
                 statsLog = [];
             }
         } catch (err) {

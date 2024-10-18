@@ -1,15 +1,7 @@
-const axios = require('axios');
-const Docker = require('dockerode');
-const config = require('../config.json')
 const CatLoggr = require('cat-loggr');
 const log = new CatLoggr();
 const fs = require('fs').promises;
 const path = require('path');
-
-async function init() {
-    // No longer used
-    log.init('init done')
-}
 
 async function createVolumesFolder() {
   try {
@@ -20,4 +12,4 @@ async function createVolumesFolder() {
   }
 }
 
-module.exports = { init, createVolumesFolder }
+module.exports = { createVolumesFolder }
