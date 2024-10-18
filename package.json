@@ -4,7 +4,6 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
     "configure": "node handlers/configure.js"
   },
   "author": "",
@@ -14,7 +13,7 @@
     "archiver": "^7.0.1",
     "axios": "^1.6.8",
     "bcrypt": "^5.1.1",
-    "body-parser": "^1.20.2",
+    "body-parser": "^1.20.3",
     "cat-loggr": "^1.2.2",
     "chalk": "^4.1.2",
     "child_process": "^1.0.2",
@@ -32,7 +31,7 @@
     "mysql2": "^3.10.3",
     "os-utils": "^0.0.14",
     "path": "^0.12.7",
-    "unzipper": "^0.12.1",
+    "unzipper": "^0.12.3",
     "ws": "^8.16.0"
   }
 }

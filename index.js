@@ -31,14 +31,13 @@ const http = require('http');
 const fs = require('node:fs');
 const path = require('path');
 const chalk = require('chalk')
+const fs2 = require('fs').promises;
 const ascii = fs.readFileSync('./handlers/ascii.txt', 'utf8');
 const { exec } = require('child_process');
-const { init, createVolumesFolder } = require('./handlers/init.js');
-const { seed } = require('./handlers/seed.js');
 const { start, createNewVolume } = require('./routes/FTP.js')
 const { createDatabaseAndUser } = require('./routes/Database.js');
 const config = require('./config.json');
-const statslogger = require('./routes/Stats.js');
+const statsLogger = require('./routes/Stats.js');
 
 const docker = new Docker({ socketPath: process.env.dockerSocket });
 
@@ -59,8 +58,29 @@ const log = new CatLoggr();
  * power controls. These routes are grouped under the '/instances' path.
  */
 console.log(chalk.gray(ascii) + chalk.white(`version v${config.version}\n`));
-init();
-seed();
+async function init() {
+    try {
+        docker.ping((err) => {
+            if (err) {
+                log.error(chalk.red('Docker is not running or not installed. Please install Docker and try again.'))
+                process.exit()
+            }
+        })
+        log.init('init done')
+
+        const volumesPath = path.join(__dirname, '../volumes');
+        await fs2.mkdir(volumesPath, { recursive: true });
+
+        log.init('volumes folder created successfully');
+
+        // Node Stats
+        statsLogger.initLogger();
+    } catch (error) {
+        log.error('failed to retrieve image list from remote! the panel might be down. error:', error.message);
+        process.exit();
+    }
+}
+init()
 
 app.use(bodyParser.json());
 app.use(basicAuth({
@@ -68,15 +88,11 @@ app.use(basicAuth({
     challenge: true
 }));
 
-
-// Node Sats
-statslogger.initLogger();
-
 async function startLoggingStats() {
     setInterval(async () => {
         try {
-            const stats = await statslogger.getSystemStats();
-            statslogger.saveStats(stats);
+            const stats = await statsLogger.getSystemStats();
+            statsLogger.saveStats(stats);
         } catch (error) {
             console.error('Error logging stats:', error);
         }
@@ -87,7 +103,7 @@ startLoggingStats();
 
 app.get('/stats', async (req, res) => {
     try {
-        const totalStats = statslogger.getSystemStats.total();
+        const totalStats = statsLogger.getSystemStats.total();
         const containers = await docker.listContainers({ all: true });
         const onlineContainersCount = containers.filter(container => container.State === 'running').length;
         const uptimeInSeconds = process.uptime();
@@ -405,8 +421,8 @@ function initializeWebSocketServer(server) {
             try {
                 await actionMap[action]();
             } catch (err) {
-                console.error(`Error performing ${action} action:`, err);
-                ws.send(`\r\n\u001b[33m[skyportd] \x1b[0Action failed: ${err.message}\r\n`);
+                log.error(`Error performing ${action} action:`, err.message);
+                ws.send(`\r\n\u001b[33m[skyportd] \x1b[0mAction failed: ${err.message}\r\n`);
             }
         }
 
@@ -483,13 +499,13 @@ app.get('/', async (req, res) => {
 
         res.json(response); // the point of this? just use the ws - yeah conn to the ws on nodes page and send that json over ws
     } catch (error) {
-        console.error('Error fetching Docker status:', error);
+        log.error('Error fetching Docker status:', error);
         res.status(500).json({ error: 'Docker is not running - skyportd will not function properly.' });
     }
 });
 
 app.use((err, req, res, next) => {
-    console.error(err.stack);
+    log.error(err.stack);
     res.status(500).send('Something has... gone wrong!');
 });
 
@@ -500,7 +516,5 @@ app.use((err, req, res, next) => {
  */
 const port = config.port;
 setTimeout(function (){
-  server.listen(port, () => {
-    log.info('skyportd is listening on port ' + port);
-  });
+  server.listen(port, () => log.info('skyportd is listening on port ' + port));
 }, 2000);
