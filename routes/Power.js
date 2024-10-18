@@ -40,7 +40,11 @@ router.post('/instances/:id/:power', async (req, res) => {
                 res.status(400).json({ message: 'Invalid power action' });
         }
     } catch (err) {
-        res.status(500).json({ message: err.message });
+        if (err.statusCode === 304) {
+            res.status(304).json({ message: err.message });
+        } else {
+            res.status(500).json({ message: err.message });
+        }
     }
 });
 
