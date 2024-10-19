@@ -58,7 +58,7 @@ const log = new CatLoggr();
  */
 async function init() {
     try {
-        const ascii = await fs2.readFile('./handlers/ascii.txt', 'utf8');
+        const ascii = fs.readFileSync('./handlers/ascii.txt', 'utf8');
         console.log(chalk.gray(ascii) + chalk.white(`version v${config.version}\n`));
         await docker.ping((err) => {
             if (err) {
