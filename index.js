@@ -32,7 +32,6 @@ const fs = require('node:fs');
 const path = require('path');
 const chalk = require('chalk')
 const fs2 = require('fs').promises;
-const ascii = fs.readFileSync('./handlers/ascii.txt', 'utf8');
 const { exec } = require('child_process');
 const { start, createNewVolume } = require('./routes/FTP.js')
 const { createDatabaseAndUser } = require('./routes/Database.js');
@@ -57,10 +56,11 @@ const log = new CatLoggr();
  * user keys from the configuration. Initializes routes for managing Docker instances, deployments, and
  * power controls. These routes are grouped under the '/instances' path.
  */
-console.log(chalk.gray(ascii) + chalk.white(`version v${config.version}\n`));
 async function init() {
     try {
-        docker.ping((err) => {
+        const ascii = fs.readFileSync('./handlers/ascii.txt', 'utf8');
+        console.log(chalk.gray(ascii) + chalk.white(`version v${config.version}\n`));
+        await docker.ping((err) => {
             if (err) {
                 log.error(chalk.red('Docker is not running or not installed. Please install Docker and try again.'))
                 process.exit()
@@ -135,24 +135,21 @@ app.get('/stats', async (req, res) => {
     }
 });
 
-
-
-
 // FTP
 start();
-app.get('/ftp/info/:id', (req, res) => {
+// FTP Route
+app.get('/ftp/info/:id', async (req, res) => {
     const filePath = './ftp/user-' + req.params.id + '.json';
-    fs.readFile(filePath, 'utf8', (err, data) => {
-        if (err) {
-            console.error('Error reading file:', err);
-            res.status(500).json({ error: 'Error reading file' });
-            return;
-        }
+    try {
+        const data = await fs2.readFile(filePath, 'utf8');
         res.json(JSON.parse(data));
-    });
+    } catch (err) {
+        console.error(`Error reading file for user ${req.params.id}:`, err);
+        res.status(500).json({ error: 'Error reading FTP information' });
+    }
 });
 
-// Databases
+// Database Route
 app.post('/database/create/:name', async (req, res) => {
     try {
         const dbName = req.params.name;
@@ -198,7 +195,6 @@ function loadRouters() {
 
 // Call the function to load routers
 loadRouters();
-
 
 /**
  * Initializes a WebSocket server tied to the HTTP server. This WebSocket server handles real-time
@@ -514,7 +510,8 @@ app.use((err, req, res, next) => {
  * Logs a startup message indicating successful listening. This delayed start allows for any necessary
  * initializations to complete before accepting incoming connections.
  */
-const port = config.port;
-setTimeout(function (){
-  server.listen(port, () => log.info('skyportd is listening on port ' + port));
-}, 2000);
+async function startServer() {
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    server.listen(config.port, () => log.info(`Skyport Daemon is listening on port ${config.port}`));
+}
+startServer();
