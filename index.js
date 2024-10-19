@@ -56,10 +56,10 @@ const log = new CatLoggr();
  * user keys from the configuration. Initializes routes for managing Docker instances, deployments, and
  * power controls. These routes are grouped under the '/instances' path.
  */
-const ascii = await fs2.readFile('./handlers/ascii.txt', 'utf8');
-console.log(chalk.gray(ascii) + chalk.white(`version v${config.version}\n`));
 async function init() {
     try {
+        const ascii = await fs2.readFile('./handlers/ascii.txt', 'utf8');
+        console.log(chalk.gray(ascii) + chalk.white(`version v${config.version}\n`));
         await docker.ping((err) => {
             if (err) {
                 log.error(chalk.red('Docker is not running or not installed. Please install Docker and try again.'))
